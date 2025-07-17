@@ -93,7 +93,11 @@ export function CartSheet({ children }: CartSheetProps) {
                       <div className="flex justify-between items-start">
                         <div>
                           <h4 className="font-medium text-sm leading-tight line-clamp-2">
-                            {item.product.name}
+                            <span
+                              dangerouslySetInnerHTML={{
+                                __html: item.product.name,
+                              }}
+                            />
                           </h4>
                           {item.selectedAttributes && (
                             <div className="flex gap-1 mt-1">

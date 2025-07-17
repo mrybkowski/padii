@@ -141,7 +141,10 @@ export default function ProductPage() {
             Produkty
           </Link>
           <span className="mx-2">/</span>
-          <span className="text-foreground">{product.name}</span>
+          <span
+            className="text-foreground"
+            dangerouslySetInnerHTML={{ __html: product.name }}
+          />
         </nav>
 
         <div className="grid lg:grid-cols-2 gap-12">
@@ -204,7 +207,9 @@ export default function ProductPage() {
                 ))}
               </div>
 
-              <h1 className="text-3xl font-bold mb-2">{product.name}</h1>
+              <h1 className="text-3xl font-bold mb-2">
+                <span dangerouslySetInnerHTML={{ __html: product.name }} />
+              </h1>
 
               <div className="flex items-center gap-4 mb-4">
                 <div className="flex items-center gap-1">

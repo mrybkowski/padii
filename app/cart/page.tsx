@@ -117,7 +117,11 @@ export default function CartPage() {
                         <div>
                           <Link href={`/products/${item.product.slug}`}>
                             <h3 className="font-medium hover:text-primary transition-colors line-clamp-2">
-                              {item.product.name}
+                              <span
+                                dangerouslySetInnerHTML={{
+                                  __html: item.product.name,
+                                }}
+                              />
                             </h3>
                           </Link>
                           {item.selectedAttributes && (

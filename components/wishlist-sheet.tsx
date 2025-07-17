@@ -146,7 +146,11 @@ export function WishlistSheet({ children }: WishlistSheetProps) {
                               onClick={() => setIsOpen(false)}
                             >
                               <h4 className="font-medium text-sm leading-tight line-clamp-2 hover:text-primary transition-colors">
-                                {product.name}
+                                <span
+                                  dangerouslySetInnerHTML={{
+                                    __html: product.name,
+                                  }}
+                                />
                               </h4>
                             </Link>
                             {product.categories.length > 0 && (

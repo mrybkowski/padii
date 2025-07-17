@@ -86,7 +86,9 @@ export function HeaderSearchBar() {
                   className="object-cover rounded mr-3"
                 />
                 <div className="text-sm">
-                  <div className="font-medium">{product.name}</div>
+                  <div className="font-medium">
+                    <span dangerouslySetInnerHTML={{ __html: product.name }} />
+                  </div>
                   <div className="text-muted-foreground text-xs">
                     {product.price} zł
                   </div>

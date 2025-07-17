@@ -722,7 +722,11 @@ export default function CheckoutPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <h4 className="font-medium text-sm line-clamp-2">
-                            {item.product.name}
+                            <span
+                              dangerouslySetInnerHTML={{
+                                __html: item.product.name,
+                              }}
+                            />
                           </h4>
                           <div className="flex justify-between items-center mt-1">
                             <span className="text-sm text-muted-foreground">

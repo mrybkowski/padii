@@ -180,7 +180,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
           {/* Product Name */}
           <Link href={`/products/${product.slug}`}>
             <h3 className="font-semibold text-sm leading-tight line-clamp-2 hover:text-primary transition-colors">
-              {product.name}
+              <span dangerouslySetInnerHTML={{ __html: product.name }} />
             </h3>
           </Link>
 
