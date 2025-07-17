@@ -243,7 +243,11 @@ export default function ProductPage() {
               </div>
 
               <p className="text-muted-foreground leading-relaxed">
-                {product.short_description}
+                <div
+                  dangerouslySetInnerHTML={{
+                    __html: product.short_description,
+                  }}
+                />
               </p>
             </div>
 
@@ -377,7 +381,11 @@ export default function ProductPage() {
                 <CardContent className="p-6">
                   <div className="prose max-w-none">
                     <p className="text-muted-foreground leading-relaxed">
-                      {product.description}
+                      <div
+                        dangerouslySetInnerHTML={{
+                          __html: product.description,
+                        }}
+                      />
                     </p>
                   </div>
                 </CardContent>

@@ -166,29 +166,33 @@ export default function ProductsPage() {
                   <div>
                     <h4 className="font-medium mb-3">Kategorie</h4>
                     <div className="space-y-2">
-                      {categories.map((category) => (
-                        <div
-                          key={category.id}
-                          className="flex items-center space-x-2"
-                        >
-                          <Checkbox
-                            id={category.slug}
-                            checked={selectedCategories.includes(category.slug)}
-                            onCheckedChange={(checked) =>
-                              handleCategoryChange(
-                                category.slug,
-                                checked as boolean
-                              )
-                            }
-                          />
-                          <label
-                            htmlFor={category.slug}
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      {categories
+                        .filter((category) => category.slug !== "bez-kategorii")
+                        .map((category) => (
+                          <div
+                            key={category.id}
+                            className="flex items-center space-x-2"
                           >
-                            {category.name} ({category.count})
-                          </label>
-                        </div>
-                      ))}
+                            <Checkbox
+                              id={category.slug}
+                              checked={selectedCategories.includes(
+                                category.slug
+                              )}
+                              onCheckedChange={(checked) =>
+                                handleCategoryChange(
+                                  category.slug,
+                                  checked as boolean
+                                )
+                              }
+                            />
+                            <label
+                              htmlFor={category.slug}
+                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                            >
+                              {category.name} ({category.count})
+                            </label>
+                          </div>
+                        ))}
                     </div>
                   </div>
 
