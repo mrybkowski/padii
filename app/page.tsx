@@ -245,19 +245,19 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-stretch">
             {benefits.map((benefit, index) => (
               <Card
                 key={index}
-                className="border-none shadow-lg hover:shadow-2xl transition-all duration-500 rounded-3xl bg-white/80 backdrop-blur-sm hover:scale-105 group overflow-hidden"
+                className="h-full flex flex-col border-none shadow-lg hover:shadow-2xl transition-transform duration-500 rounded-3xl bg-white/80 backdrop-blur-sm hover:-translate-y-1 will-change-transform group overflow-hidden"
                 style={{ animationDelay: `${index * 0.1}s` }}
               >
-                <CardContent className="p-8 text-center relative">
+                <CardContent className="flex-1 p-8 text-center relative flex flex-col justify-between">
                   <div
                     className={`absolute inset-0 bg-gradient-to-br ${benefit.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300 rounded-3xl`}
                   ></div>
 
-                  <div className="relative inline-flex items-center justify-center w-20 h-20 mb-6">
+                  <div className="relative inline-flex items-center justify-center w-20 h-20 mb-6 mx-auto">
                     <div
                       className={`absolute inset-0 bg-gradient-to-r ${benefit.gradient} rounded-full opacity-10 group-hover:opacity-20 transition-opacity group-hover:scale-110 duration-300`}
                     ></div>
@@ -276,6 +276,7 @@ export default function Home() {
                   <h3 className="font-bold text-xl text-foreground mb-4 group-hover:text-primary transition-colors">
                     {benefit.title}
                   </h3>
+
                   <p className="text-muted-foreground leading-relaxed">
                     {benefit.description}
                   </p>
