@@ -286,7 +286,7 @@ export default function Home() {
           </div>
 
           {/* Enhanced stats section */}
-          <div className="mt-20 bg-gradient-to-r rounded-3xl shadow-2xl p-12">
+          <div className="max-w-3xl mx-auto mt-20 bg-gradient-to-r rounded-3xl p-12">
             <div className="text-center mb-8">
               <h3 className="text-2xl font-bold text-foreground mb-2">
                 Nasze osiągnięcia w liczbach 📊
@@ -303,9 +303,17 @@ export default function Home() {
                   label: "Zadowolonych klientów",
                   emoji: "😊",
                 },
-                { number: "3", label: "Lata doświadczenia", emoji: "🎂" },
-                { number: "99.2%", label: "Pozytywnych opinii", emoji: "⭐" },
-              ].map((stat, index) => (
+                {
+                  number: "3",
+                  label: "Lata doświadczenia",
+                  emoji: "🎂",
+                },
+                {
+                  number: "99.2%",
+                  label: "Pozytywnych opinii",
+                  emoji: "⭐",
+                },
+              ].map((stat, index, arr) => (
                 <div key={index} className="text-center group cursor-pointer">
                   <div className="text-5xl font-bold mb-2 group-hover:scale-110 transition-transform">
                     {stat.number}
@@ -316,6 +324,10 @@ export default function Home() {
                   <div className="text-2xl group-hover:scale-125 group-hover:rotate-12 transition-all duration-300">
                     {stat.emoji}
                   </div>
+
+                  {index < arr.length - 1 && (
+                    <hr className="my-8 border-gray-200 md:hidden" />
+                  )}
                 </div>
               ))}
             </div>
