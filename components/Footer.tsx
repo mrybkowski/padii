@@ -30,7 +30,7 @@ export function Footer() {
             links={[
               { label: "Kontakt", href: "#" },
               { label: "Dostawa i płatność", href: "#" },
-              { label: "Zwroty i reklamacje", href: "#" },
+              { label: "Zwroty i reklamacje", href: "/returns" },
               { label: "Regulamin", href: "#" },
               { label: "Polityka prywatności", href: "/privacy-policy" },
             ]}
