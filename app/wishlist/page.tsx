@@ -47,7 +47,7 @@ export default function WishlistPage() {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
-        <div className="container mx-auto px-4 py-8">
+        <div className="max-w-7xl mx-auto px-4 py-8">
           <div className="animate-pulse space-y-4">
             <div className="h-8 bg-gray-300 rounded w-1/4"></div>
             <div className="h-4 bg-gray-300 rounded w-1/2"></div>
@@ -69,7 +69,7 @@ export default function WishlistPage() {
     <div className="min-h-screen bg-gray-50">
       <Header />
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
             <Heart className="h-8 w-8 text-red-500" />

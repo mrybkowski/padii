@@ -15,12 +15,8 @@ export function HeaderActionButtons() {
 
   return (
     <div className="flex items-center space-x-2">
-      <Button variant="ghost" size="icon" className="md:hidden">
-        <Search className="h-5 w-5" />
-      </Button>
-
       <WishlistSheet>
-        <Button variant="ghost" size="icon" className="hidden md:flex relative">
+        <Button variant="ghost" size="icon" className="relative">
           <Heart className="h-5 w-5" />
           {getWishlistCount() > 0 && (
             <Badge

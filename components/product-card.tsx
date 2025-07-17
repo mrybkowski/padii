@@ -107,9 +107,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
             className={cn(
               "absolute top-3 right-3 h-8 w-8 rounded-full bg-white/80 backdrop-blur-sm",
               "transition-all duration-200 hover:bg-white hover:scale-110",
-              isHovered
-                ? "opacity-100 translate-y-0"
-                : "opacity-0 translate-y-2",
+              "opacity-100 translate-y-0 md:opacity-0 md:translate-y-2 md:group-hover:opacity-100 md:group-hover:translate-y-0",
               isInWishlist(product.id) && "text-red-500"
             )}
             onClick={(e) => {
@@ -130,9 +128,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
           <div
             className={cn(
               "absolute inset-x-3 bottom-3 transition-all duration-300",
-              isHovered
-                ? "opacity-100 translate-y-0"
-                : "opacity-0 translate-y-4"
+              "opacity-100 translate-y-0 md:opacity-0 md:translate-y-4 md:group-hover:opacity-100 md:group-hover:translate-y-0"
             )}
           >
             <Button
