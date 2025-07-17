@@ -30,7 +30,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useCart } from "@/hooks/use-cart";
-import { Header } from "@/components/header";
+import { Header } from "@/components/Header";
 import { wordpressAPI } from "@/lib/wordpress";
 
 interface CheckoutFormData {
@@ -344,7 +344,7 @@ export default function CheckoutPage() {
     <div className="min-h-screen bg-gray-50">
       <Header />
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Kasa</h1>
           <p className="text-muted-foreground">Dokończ swoje zamówienie</p>
@@ -692,7 +692,7 @@ export default function CheckoutPage() {
 
             {/* Order Summary */}
             <div className="space-y-6">
-              <Card className="sticky top-4">
+              <Card className="sticky top-24">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <ShoppingBag className="h-5 w-5" />

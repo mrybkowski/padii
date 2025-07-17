@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { Product, wordpressAPI } from "@/lib/wordpress";
 import { useCart } from "@/hooks/use-cart";
-import { Header } from "@/components/header";
+import { Header } from "@/components/Header";
 import { cn } from "@/lib/utils";
 import { useWishlist } from "@/hooks/use-wishlist";
 import { Footer } from "@/components/Footer";

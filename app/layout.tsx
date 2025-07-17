@@ -5,8 +5,9 @@ import { Inter } from "next/font/google";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "ShopWP - Sklep internetowy",
-  description: "Nowoczesny sklep internetowy z WordPress API",
+  title: "Padii - Sklep internetowy",
+  description:
+    "Sklep interneowy z podkładami higienicznymi. Kupuj wygodnie online!",
 };
 
 export default function RootLayout({

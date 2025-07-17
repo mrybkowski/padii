@@ -1,30 +1,41 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Minus, Plus, Trash2, ShoppingBag, ArrowLeft, ArrowRight } from 'lucide-react';
-import { useCart } from '@/hooks/use-cart';
-import { Header } from '@/components/header';
+import { useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import {
+  Minus,
+  Plus,
+  Trash2,
+  ShoppingBag,
+  ArrowLeft,
+  ArrowRight,
+} from "lucide-react";
+import { useCart } from "@/hooks/use-cart";
+import { Header } from "@/components/Header";
 
 export default function CartPage() {
   const { cart, updateQuantity, removeFromCart } = useCart();
-  const [couponCode, setCouponCode] = useState('');
+  const [couponCode, setCouponCode] = useState("");
 
   const formatPrice = (price: string) => {
     const numPrice = parseFloat(price);
-    return new Intl.NumberFormat('pl-PL', {
-      style: 'currency',
-      currency: 'PLN'
+    return new Intl.NumberFormat("pl-PL", {
+      style: "currency",
+      currency: "PLN",
     }).format(numPrice);
   };
 
-  const handleQuantityChange = (productId: number, newQuantity: number, variationId?: number) => {
+  const handleQuantityChange = (
+    productId: number,
+    newQuantity: number,
+    variationId?: number
+  ) => {
     if (newQuantity === 0) {
       removeFromCart(productId, variationId);
     } else {
@@ -44,7 +55,7 @@ export default function CartPage() {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
-        <div className="container mx-auto px-4 py-16">
+        <div className="max-w-7xl mx-auto px-4 py-16">
           <div className="max-w-md mx-auto text-center">
             <ShoppingBag className="h-16 w-16 text-muted-foreground mx-auto mb-6" />
             <h1 className="text-2xl font-bold mb-4">Koszyk jest pusty</h1>
@@ -66,11 +77,13 @@ export default function CartPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      
-      <div className="container mx-auto px-4 py-8">
+
+      <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Koszyk</h1>
-          <p className="text-muted-foreground">Zarządzaj produktami w koszyku</p>
+          <p className="text-muted-foreground">
+            Zarządzaj produktami w koszyku
+          </p>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
@@ -82,17 +95,23 @@ export default function CartPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {cart.items.map((item) => (
-                  <div key={`${item.product.id}-${item.variationId || ''}`} className="flex gap-4 p-4 border rounded-lg">
+                  <div
+                    key={`${item.product.id}-${item.variationId || ""}`}
+                    className="flex gap-4 p-4 border rounded-lg"
+                  >
                     <div className="relative h-20 w-20 flex-shrink-0">
                       <Image
-                        src={item.product.images[0]?.src || '/placeholder-product.jpg'}
+                        src={
+                          item.product.images[0]?.src ||
+                          "/placeholder-product.jpg"
+                        }
                         alt={item.product.images[0]?.alt || item.product.name}
                         fill
                         className="object-cover rounded"
                         sizes="80px"
                       />
                     </div>
-                    
+
                     <div className="flex-1 space-y-2">
                       <div className="flex justify-between items-start">
                         <div>
@@ -103,51 +122,86 @@ export default function CartPage() {
                           </Link>
                           {item.selectedAttributes && (
                             <div className="flex gap-1 mt-1">
-                              {Object.entries(item.selectedAttributes).map(([key, value]) => (
-                                <Badge key={key} variant="outline" className="text-xs">
-                                  {value}
-                                </Badge>
-                              ))}
+                              {Object.entries(item.selectedAttributes).map(
+                                ([key, value]) => (
+                                  <Badge
+                                    key={key}
+                                    variant="outline"
+                                    className="text-xs"
+                                  >
+                                    {value}
+                                  </Badge>
+                                )
+                              )}
                             </div>
                           )}
                         </div>
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => removeFromCart(item.product.id, item.variationId)}
+                          onClick={() =>
+                            removeFromCart(item.product.id, item.variationId)
+                          }
                           className="text-muted-foreground hover:text-destructive"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                      
+
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <Button
                             variant="outline"
                             size="icon"
-                            onClick={() => handleQuantityChange(item.product.id, item.quantity - 1, item.variationId)}
+                            onClick={() =>
+                              handleQuantityChange(
+                                item.product.id,
+                                item.quantity - 1,
+                                item.variationId
+                              )
+                            }
                             className="h-8 w-8"
                           >
                             <Minus className="h-4 w-4" />
                           </Button>
-                          <span className="w-12 text-center font-medium">{item.quantity}</span>
+                          <span className="w-12 text-center font-medium">
+                            {item.quantity}
+                          </span>
                           <Button
                             variant="outline"
                             size="icon"
-                            onClick={() => handleQuantityChange(item.product.id, item.quantity + 1, item.variationId)}
+                            onClick={() =>
+                              handleQuantityChange(
+                                item.product.id,
+                                item.quantity + 1,
+                                item.variationId
+                              )
+                            }
                             className="h-8 w-8"
                           >
                             <Plus className="h-4 w-4" />
                           </Button>
                         </div>
-                        
+
                         <div className="text-right">
                           <div className="font-semibold">
-                            {formatPrice((parseFloat(item.product.sale_price || item.product.regular_price || '0') * item.quantity).toString())}
+                            {formatPrice(
+                              (
+                                parseFloat(
+                                  item.product.sale_price ||
+                                    item.product.regular_price ||
+                                    "0"
+                                ) * item.quantity
+                              ).toString()
+                            )}
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            {formatPrice(item.product.sale_price || item.product.regular_price || '0')} każdy
+                            {formatPrice(
+                              item.product.sale_price ||
+                                item.product.regular_price ||
+                                "0"
+                            )}{" "}
+                            każdy
                           </div>
                         </div>
                       </div>
@@ -213,7 +267,9 @@ export default function CartPage() {
                   )}
                   {cart.total < 200 && (
                     <div className="text-sm text-muted-foreground">
-                      Dodaj produkty za {formatPrice((200 - cart.total).toString())} aby otrzymać darmową dostawę
+                      Dodaj produkty za{" "}
+                      {formatPrice((200 - cart.total).toString())} aby otrzymać
+                      darmową dostawę
                     </div>
                   )}
                   <Separator />

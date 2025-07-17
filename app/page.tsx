@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { Product, wordpressAPI } from "@/lib/wordpress";
 import { ProductSlider } from "@/components/product-slider";
-import { Header } from "@/components/header";
+import { Header } from "@/components/Header";
 import Image from "next/image";
 import { Footer } from "@/components/Footer";
 
@@ -324,7 +324,7 @@ export default function Home() {
 
       {/* All Products Slider */}
       <section id="products" className="py-16 bg-slate-50">
-        <div className="max-w-7xl container mx-auto px-4">
+        <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-12">
             <Badge className="mb-4">Podkłady higieniczne</Badge>
             <h2 className="text-4xl lg:text-5xl font-bold mb-6 text-foreground">

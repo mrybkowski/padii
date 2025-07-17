@@ -17,7 +17,7 @@ import { Slider } from "@/components/ui/slider";
 import { Search, Filter, SlidersHorizontal, X } from "lucide-react";
 import { Product, Category, wordpressAPI } from "@/lib/wordpress";
 import { ProductGrid } from "@/components/product-grid";
-import { Header } from "@/components/header";
+import { Header } from "@/components/Header";
 import { cn } from "@/lib/utils";
 import { Footer } from "@/components/Footer";
 
