@@ -29,7 +29,7 @@ export function Footer() {
             title="Obsługa klienta"
             links={[
               { label: "Kontakt", href: "#" },
-              { label: "Dostawa i płatność", href: "#" },
+              { label: "Dostawa i płatność", href: "/delivery" },
               { label: "Zwroty i reklamacje", href: "/returns" },
               { label: "Regulamin", href: "#" },
               { label: "Polityka prywatności", href: "/privacy-policy" },
