@@ -32,6 +32,7 @@ import {
 import { useCart } from "@/hooks/use-cart";
 import { Header } from "@/components/Header";
 import { wordpressAPI } from "@/lib/wordpress";
+import Link from "next/link";
 
 interface CheckoutFormData {
   billing: {
@@ -819,7 +820,14 @@ export default function CheckoutPage() {
                   </Button>
 
                   <p className="text-xs text-muted-foreground text-center">
-                    Klikając Złóż zamówienie akceptujesz nasze warunki sprzedaży
+                    Klikając Złóż zamówienie akceptujesz naszą&nbsp;
+                    <Link className="hover:underline" href="/privacy-policy">
+                      politykę prywatności
+                    </Link>
+                    &nbsp;oraz&nbsp;
+                    <Link className="hover:underline" href="/terms">
+                      warunki sprzedaży.
+                    </Link>
                   </p>
                 </CardContent>
               </Card>
