@@ -1,3 +1,5 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
 import { Search, ShoppingCart, Heart, Menu } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
