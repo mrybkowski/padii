@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useState } from 'react';
-import useEmblaCarousel from 'embla-carousel-react';
-import { Product } from '@/lib/wordpress';
-import { ProductCard } from './product-card';
-import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { useCallback, useEffect, useState } from "react";
+import useEmblaCarousel from "embla-carousel-react";
+import { Product } from "@/lib/wordpress";
+import { ProductCard } from "./product-card";
+import { Button } from "@/components/ui/button";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ProductSliderProps {
   products: Product[];
@@ -15,15 +15,20 @@ interface ProductSliderProps {
   isLoading?: boolean;
 }
 
-export function ProductSlider({ products, title, className, isLoading }: ProductSliderProps) {
+export function ProductSlider({
+  products,
+  title,
+  className,
+  isLoading,
+}: ProductSliderProps) {
   const [emblaRef, emblaApi] = useEmblaCarousel({
-    align: 'start',
+    align: "start",
     slidesToScroll: 1,
     breakpoints: {
-      '(min-width: 768px)': { slidesToScroll: 2 },
-      '(min-width: 1024px)': { slidesToScroll: 3 },
-      '(min-width: 1280px)': { slidesToScroll: 4 }
-    }
+      "(min-width: 768px)": { slidesToScroll: 2 },
+      "(min-width: 1024px)": { slidesToScroll: 3 },
+      "(min-width: 1280px)": { slidesToScroll: 4 },
+    },
   });
 
   const [prevBtnDisabled, setPrevBtnDisabled] = useState(true);
@@ -46,8 +51,8 @@ export function ProductSlider({ products, title, className, isLoading }: Product
     if (!emblaApi) return;
 
     onSelect(emblaApi);
-    emblaApi.on('reInit', onSelect);
-    emblaApi.on('select', onSelect);
+    emblaApi.on("reInit", onSelect);
+    emblaApi.on("select", onSelect);
   }, [emblaApi, onSelect]);
 
   if (isLoading) {
@@ -60,7 +65,10 @@ export function ProductSlider({ products, title, className, isLoading }: Product
         )}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="bg-muted animate-pulse rounded-lg h-[400px]" />
+            <div
+              key={i}
+              className="bg-muted animate-pulse rounded-lg h-[400px]"
+            />
           ))}
         </div>
       </div>
@@ -105,11 +113,14 @@ export function ProductSlider({ products, title, className, isLoading }: Product
           </div>
         </div>
       )}
-      
+
       <div className="overflow-hidden" ref={emblaRef}>
         <div className="flex gap-6">
           {products.map((product) => (
-            <div key={product.id} className="flex-none w-full sm:w-1/2 lg:w-1/3 xl:w-1/4">
+            <div
+              key={product.id}
+              className="flex-none w-full sm:w-1/2 lg:w-1/3 xl:w-1/4"
+            >
               <ProductCard product={product} />
             </div>
           ))}

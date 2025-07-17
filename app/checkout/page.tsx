@@ -1,31 +1,37 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import Image from 'next/image';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  CreditCard, 
-  Truck, 
-  User, 
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  CreditCard,
+  Truck,
+  User,
   ShoppingBag,
   AlertCircle,
   CheckCircle,
-  Loader2
-} from 'lucide-react';
-import { useCart } from '@/hooks/use-cart';
-import { Header } from '@/components/header';
-import { wordpressAPI } from '@/lib/wordpress';
+  Loader2,
+} from "lucide-react";
+import { useCart } from "@/hooks/use-cart";
+import { Header } from "@/components/header";
+import { wordpressAPI } from "@/lib/wordpress";
 
 interface CheckoutFormData {
   billing: {
@@ -62,52 +68,52 @@ export default function CheckoutPage() {
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
   const [shippingToBilling, setShippingToBilling] = useState(true);
-  const [couponCode, setCouponCode] = useState('');
+  const [couponCode, setCouponCode] = useState("");
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const [formData, setFormData] = useState<CheckoutFormData>({
     billing: {
-      first_name: '',
-      last_name: '',
-      email: '',
-      phone: '',
-      address_1: '',
-      address_2: '',
-      city: '',
-      postcode: '',
-      country: 'PL',
-      company: '',
+      first_name: "",
+      last_name: "",
+      email: "",
+      phone: "",
+      address_1: "",
+      address_2: "",
+      city: "",
+      postcode: "",
+      country: "PL",
+      company: "",
     },
     shipping: {},
-    payment_method: 'cod',
-    shipping_method: 'standard',
-    customer_note: '',
+    payment_method: "cod",
+    shipping_method: "standard",
+    customer_note: "",
   });
 
   // Check if cart is empty and redirect only after component mounts
   useEffect(() => {
     setIsLoading(false);
-    
+
     // Only redirect if cart is empty and we're not showing success
     if (cart.items.length === 0 && !orderSuccess) {
       const timer = setTimeout(() => {
-        router.push('/products');
+        router.push("/products");
       }, 100);
       return () => clearTimeout(timer);
     }
   }, [cart.items.length, orderSuccess, router]);
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('pl-PL', {
-      style: 'currency',
-      currency: 'PLN'
+    return new Intl.NumberFormat("pl-PL", {
+      style: "currency",
+      currency: "PLN",
     }).format(price);
   };
 
   const calculateShipping = () => {
-    if (formData.shipping_method === 'express') return 25;
+    if (formData.shipping_method === "express") return 25;
     return cart.total >= 200 ? 0 : 15;
   };
 
@@ -118,51 +124,63 @@ export default function CheckoutPage() {
 
   const validateCoupon = async () => {
     if (!couponCode.trim()) return;
-    
+
     setIsValidatingCoupon(true);
     setOrderError(null);
-    
+
     try {
       const coupons = await wordpressAPI.validateCoupon(couponCode);
       if (coupons.length > 0) {
         const coupon = coupons[0];
-        const discount = coupon.discount_type === 'percent' 
-          ? (cart.total * parseFloat(coupon.amount)) / 100
-          : parseFloat(coupon.amount);
+        const discount =
+          coupon.discount_type === "percent"
+            ? (cart.total * parseFloat(coupon.amount)) / 100
+            : parseFloat(coupon.amount);
         setCouponDiscount(discount);
       } else {
-        setOrderError('Nieprawidłowy kod kuponu');
+        setOrderError("Nieprawidłowy kod kuponu");
       }
     } catch (error) {
-      setOrderError('Nieprawidłowy kod kuponu');
+      setOrderError("Nieprawidłowy kod kuponu");
     } finally {
       setIsValidatingCoupon(false);
     }
   };
 
-  const handleInputChange = (section: 'billing' | 'shipping', field: string, value: string) => {
-    setFormData(prev => ({
+  const handleInputChange = (
+    section: "billing" | "shipping",
+    field: string,
+    value: string
+  ) => {
+    setFormData((prev) => ({
       ...prev,
       [section]: {
         ...prev[section],
-        [field]: value
-      }
+        [field]: value,
+      },
     }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Basic validation
     const { billing } = formData;
-    if (!billing.first_name || !billing.last_name || !billing.email || !billing.phone || 
-        !billing.address_1 || !billing.city || !billing.postcode) {
-      setOrderError('Proszę wypełnić wszystkie wymagane pola');
+    if (
+      !billing.first_name ||
+      !billing.last_name ||
+      !billing.email ||
+      !billing.phone ||
+      !billing.address_1 ||
+      !billing.city ||
+      !billing.postcode
+    ) {
+      setOrderError("Proszę wypełnić wszystkie wymagane pola");
       return;
     }
 
     if (!formData.payment_method || !formData.shipping_method) {
-      setOrderError('Proszę wybrać metodę płatności i dostawy');
+      setOrderError("Proszę wybrać metodę płatności i dostawy");
       return;
     }
 
@@ -176,45 +194,53 @@ export default function CheckoutPage() {
         set_paid: false,
         billing: formData.billing,
         shipping: shippingToBilling ? formData.billing : formData.shipping,
-        line_items: cart.items.map(item => ({
+        line_items: cart.items.map((item) => ({
           product_id: item.product.id,
           variation_id: item.variationId || 0,
           quantity: item.quantity,
         })),
-        shipping_lines: [{
-          method_id: formData.shipping_method,
-          method_title: getShippingMethodTitle(formData.shipping_method),
-          total: calculateShipping().toString(),
-        }],
-        coupon_lines: couponCode ? [{
-          code: couponCode,
-          discount: couponDiscount.toString(),
-        }] : [],
-        customer_note: formData.customer_note || '',
+        shipping_lines: [
+          {
+            method_id: formData.shipping_method,
+            method_title: getShippingMethodTitle(formData.shipping_method),
+            total: calculateShipping().toString(),
+          },
+        ],
+        coupon_lines: couponCode
+          ? [
+              {
+                code: couponCode,
+                discount: couponDiscount.toString(),
+              },
+            ]
+          : [],
+        customer_note: formData.customer_note || "",
         meta_data: [
           {
-            key: '_order_total',
-            value: calculateTotal().toString()
-          }
-        ]
+            key: "_order_total",
+            value: calculateTotal().toString(),
+          },
+        ],
       };
 
       const order = await wordpressAPI.createOrder(orderData);
-      
+
       if (order.id) {
         clearCart();
         setOrderSuccess(true);
-        
+
         // Redirect to payment if needed
-        if (order.payment_url && formData.payment_method !== 'cod') {
+        if (order.payment_url && formData.payment_method !== "cod") {
           setTimeout(() => {
             window.location.href = order.payment_url;
           }, 2000);
         }
       }
     } catch (error) {
-      console.error('Order creation error:', error);
-      setOrderError('Wystąpił błąd podczas składania zamówienia. Spróbuj ponownie.');
+      console.error("Order creation error:", error);
+      setOrderError(
+        "Wystąpił błąd podczas składania zamówienia. Spróbuj ponownie."
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -222,18 +248,25 @@ export default function CheckoutPage() {
 
   const getPaymentMethodTitle = (method: string) => {
     switch (method) {
-      case 'cod': return 'Płatność przy odbiorze';
-      case 'bacs': return 'Przelew bankowy';
-      case 'stripe': return 'Karta płatnicza';
-      default: return 'Płatność przy odbiorze';
+      case "cod":
+        return "Płatność przy odbiorze";
+      case "bacs":
+        return "Przelew bankowy";
+      case "stripe":
+        return "Karta płatnicza";
+      default:
+        return "Płatność przy odbiorze";
     }
   };
 
   const getShippingMethodTitle = (method: string) => {
     switch (method) {
-      case 'standard': return 'Dostawa standardowa';
-      case 'express': return 'Dostawa ekspresowa';
-      default: return 'Dostawa standardowa';
+      case "standard":
+        return "Dostawa standardowa";
+      case "express":
+        return "Dostawa ekspresowa";
+      default:
+        return "Dostawa standardowa";
     }
   };
 
@@ -266,10 +299,17 @@ export default function CheckoutPage() {
               Dziękujemy za zakupy. Zamówienie zostało przyjęte do realizacji.
             </p>
             <div className="space-y-3">
-              <Button onClick={() => router.push('/products')} className="w-full">
+              <Button
+                onClick={() => router.push("/products")}
+                className="w-full"
+              >
                 Kontynuuj zakupy
               </Button>
-              <Button variant="outline" onClick={() => router.push('/')} className="w-full">
+              <Button
+                variant="outline"
+                onClick={() => router.push("/")}
+                className="w-full"
+              >
                 Powrót do strony głównej
               </Button>
             </div>
@@ -291,7 +331,7 @@ export default function CheckoutPage() {
             <p className="text-muted-foreground mb-8">
               Dodaj produkty do koszyka, aby przejść do kasy
             </p>
-            <Button onClick={() => router.push('/products')} size="lg">
+            <Button onClick={() => router.push("/products")} size="lg">
               Przeglądaj produkty
             </Button>
           </div>
@@ -303,7 +343,7 @@ export default function CheckoutPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      
+
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Kasa</h1>
@@ -338,17 +378,29 @@ export default function CheckoutPage() {
                       <Input
                         id="first_name"
                         value={formData.billing.first_name}
-                        onChange={(e) => handleInputChange('billing', 'first_name', e.target.value)}
+                        onChange={(e) =>
+                          handleInputChange(
+                            "billing",
+                            "first_name",
+                            e.target.value
+                          )
+                        }
                         required
                       />
                     </div>
-                    
+
                     <div>
                       <Label htmlFor="last_name">Nazwisko *</Label>
                       <Input
                         id="last_name"
                         value={formData.billing.last_name}
-                        onChange={(e) => handleInputChange('billing', 'last_name', e.target.value)}
+                        onChange={(e) =>
+                          handleInputChange(
+                            "billing",
+                            "last_name",
+                            e.target.value
+                          )
+                        }
                         required
                       />
                     </div>
@@ -359,7 +411,9 @@ export default function CheckoutPage() {
                     <Input
                       id="company"
                       value={formData.billing.company}
-                      onChange={(e) => handleInputChange('billing', 'company', e.target.value)}
+                      onChange={(e) =>
+                        handleInputChange("billing", "company", e.target.value)
+                      }
                     />
                   </div>
 
@@ -370,17 +424,21 @@ export default function CheckoutPage() {
                         id="email"
                         type="email"
                         value={formData.billing.email}
-                        onChange={(e) => handleInputChange('billing', 'email', e.target.value)}
+                        onChange={(e) =>
+                          handleInputChange("billing", "email", e.target.value)
+                        }
                         required
                       />
                     </div>
-                    
+
                     <div>
                       <Label htmlFor="phone">Telefon *</Label>
                       <Input
                         id="phone"
                         value={formData.billing.phone}
-                        onChange={(e) => handleInputChange('billing', 'phone', e.target.value)}
+                        onChange={(e) =>
+                          handleInputChange("billing", "phone", e.target.value)
+                        }
                         required
                       />
                     </div>
@@ -391,7 +449,13 @@ export default function CheckoutPage() {
                     <Input
                       id="address_1"
                       value={formData.billing.address_1}
-                      onChange={(e) => handleInputChange('billing', 'address_1', e.target.value)}
+                      onChange={(e) =>
+                        handleInputChange(
+                          "billing",
+                          "address_1",
+                          e.target.value
+                        )
+                      }
                       required
                     />
                   </div>
@@ -401,7 +465,13 @@ export default function CheckoutPage() {
                     <Input
                       id="address_2"
                       value={formData.billing.address_2}
-                      onChange={(e) => handleInputChange('billing', 'address_2', e.target.value)}
+                      onChange={(e) =>
+                        handleInputChange(
+                          "billing",
+                          "address_2",
+                          e.target.value
+                        )
+                      }
                     />
                   </div>
 
@@ -411,26 +481,36 @@ export default function CheckoutPage() {
                       <Input
                         id="city"
                         value={formData.billing.city}
-                        onChange={(e) => handleInputChange('billing', 'city', e.target.value)}
+                        onChange={(e) =>
+                          handleInputChange("billing", "city", e.target.value)
+                        }
                         required
                       />
                     </div>
-                    
+
                     <div>
                       <Label htmlFor="postcode">Kod pocztowy *</Label>
                       <Input
                         id="postcode"
                         value={formData.billing.postcode}
-                        onChange={(e) => handleInputChange('billing', 'postcode', e.target.value)}
+                        onChange={(e) =>
+                          handleInputChange(
+                            "billing",
+                            "postcode",
+                            e.target.value
+                          )
+                        }
                         required
                       />
                     </div>
-                    
+
                     <div>
                       <Label htmlFor="country">Kraj *</Label>
-                      <Select 
-                        value={formData.billing.country} 
-                        onValueChange={(value) => handleInputChange('billing', 'country', value)}
+                      <Select
+                        value={formData.billing.country}
+                        onValueChange={(value) =>
+                          handleInputChange("billing", "country", value)
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Wybierz kraj" />
@@ -460,17 +540,20 @@ export default function CheckoutPage() {
                     <Checkbox
                       id="shipping-to-billing"
                       checked={shippingToBilling}
-                      onCheckedChange={setShippingToBilling}
+                      onCheckedChange={(checked) =>
+                        setShippingToBilling(checked === true)
+                      }
                     />
                     <Label htmlFor="shipping-to-billing">
                       Dostawa na adres rozliczeniowy
                     </Label>
                   </div>
-                  
+
                   {!shippingToBilling && (
                     <div className="space-y-4">
                       <p className="text-sm text-muted-foreground">
-                        Formularz adresu dostawy będzie tutaj (podobny do rozliczeniowego)
+                        Formularz adresu dostawy będzie tutaj (podobny do
+                        rozliczeniowego)
                       </p>
                     </div>
                   )}
@@ -486,32 +569,45 @@ export default function CheckoutPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <RadioGroup 
-                    value={formData.shipping_method} 
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, shipping_method: value }))}
+                  <RadioGroup
+                    value={formData.shipping_method}
+                    onValueChange={(value) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        shipping_method: value,
+                      }))
+                    }
                   >
                     <div className="flex items-center space-x-2 p-3 border rounded-lg">
                       <RadioGroupItem value="standard" id="standard" />
                       <Label htmlFor="standard" className="flex-1">
                         <div className="flex justify-between items-center">
                           <div>
-                            <div className="font-medium">Dostawa standardowa</div>
-                            <div className="text-sm text-muted-foreground">3-5 dni roboczych</div>
+                            <div className="font-medium">
+                              Dostawa standardowa
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              3-5 dni roboczych
+                            </div>
                           </div>
                           <div className="font-medium">
-                            {cart.total >= 200 ? 'Darmowa' : formatPrice(15)}
+                            {cart.total >= 200 ? "Darmowa" : formatPrice(15)}
                           </div>
                         </div>
                       </Label>
                     </div>
-                    
+
                     <div className="flex items-center space-x-2 p-3 border rounded-lg">
                       <RadioGroupItem value="express" id="express" />
                       <Label htmlFor="express" className="flex-1">
                         <div className="flex justify-between items-center">
                           <div>
-                            <div className="font-medium">Dostawa ekspresowa</div>
-                            <div className="text-sm text-muted-foreground">1-2 dni robocze</div>
+                            <div className="font-medium">
+                              Dostawa ekspresowa
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              1-2 dni robocze
+                            </div>
                           </div>
                           <div className="font-medium">{formatPrice(25)}</div>
                         </div>
@@ -530,31 +626,44 @@ export default function CheckoutPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <RadioGroup 
-                    value={formData.payment_method} 
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, payment_method: value }))}
+                  <RadioGroup
+                    value={formData.payment_method}
+                    onValueChange={(value) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        payment_method: value,
+                      }))
+                    }
                   >
                     <div className="flex items-center space-x-2 p-3 border rounded-lg">
                       <RadioGroupItem value="cod" id="cod" />
                       <Label htmlFor="cod" className="flex-1">
-                        <div className="font-medium">Płatność przy odbiorze</div>
-                        <div className="text-sm text-muted-foreground">Zapłać gotówką kurierowi</div>
+                        <div className="font-medium">
+                          Płatność przy odbiorze
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          Zapłać gotówką kurierowi
+                        </div>
                       </Label>
                     </div>
-                    
+
                     <div className="flex items-center space-x-2 p-3 border rounded-lg">
                       <RadioGroupItem value="bacs" id="bacs" />
                       <Label htmlFor="bacs" className="flex-1">
                         <div className="font-medium">Przelew bankowy</div>
-                        <div className="text-sm text-muted-foreground">Tradycyjny przelew na konto</div>
+                        <div className="text-sm text-muted-foreground">
+                          Tradycyjny przelew na konto
+                        </div>
                       </Label>
                     </div>
-                    
+
                     <div className="flex items-center space-x-2 p-3 border rounded-lg">
                       <RadioGroupItem value="stripe" id="stripe" />
                       <Label htmlFor="stripe" className="flex-1">
                         <div className="font-medium">Karta płatnicza</div>
-                        <div className="text-sm text-muted-foreground">Visa, Mastercard, BLIK</div>
+                        <div className="text-sm text-muted-foreground">
+                          Visa, Mastercard, BLIK
+                        </div>
                       </Label>
                     </div>
                   </RadioGroup>
@@ -570,7 +679,12 @@ export default function CheckoutPage() {
                   <Textarea
                     placeholder="Dodatkowe informacje o zamówieniu (opcjonalnie)"
                     value={formData.customer_note}
-                    onChange={(e) => setFormData(prev => ({ ...prev, customer_note: e.target.value }))}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        customer_note: e.target.value,
+                      }))
+                    }
                   />
                 </CardContent>
               </Card>
@@ -589,10 +703,16 @@ export default function CheckoutPage() {
                   {/* Cart Items */}
                   <div className="space-y-3">
                     {cart.items.map((item) => (
-                      <div key={`${item.product.id}-${item.variationId || ''}`} className="flex gap-3">
+                      <div
+                        key={`${item.product.id}-${item.variationId || ""}`}
+                        className="flex gap-3"
+                      >
                         <div className="relative h-12 w-12 flex-shrink-0">
                           <Image
-                            src={item.product.images[0]?.src || '/placeholder-product.jpg'}
+                            src={
+                              item.product.images[0]?.src ||
+                              "/placeholder-product.jpg"
+                            }
                             alt={item.product.name}
                             fill
                             className="object-cover rounded"
@@ -600,11 +720,21 @@ export default function CheckoutPage() {
                           />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-sm line-clamp-2">{item.product.name}</h4>
+                          <h4 className="font-medium text-sm line-clamp-2">
+                            {item.product.name}
+                          </h4>
                           <div className="flex justify-between items-center mt-1">
-                            <span className="text-sm text-muted-foreground">Ilość: {item.quantity}</span>
+                            <span className="text-sm text-muted-foreground">
+                              Ilość: {item.quantity}
+                            </span>
                             <span className="font-medium text-sm">
-                              {formatPrice(parseFloat(item.product.sale_price || item.product.regular_price || '0') * item.quantity)}
+                              {formatPrice(
+                                parseFloat(
+                                  item.product.sale_price ||
+                                    item.product.regular_price ||
+                                    "0"
+                                ) * item.quantity
+                              )}
                             </span>
                           </div>
                         </div>
@@ -628,7 +758,11 @@ export default function CheckoutPage() {
                         onClick={validateCoupon}
                         disabled={isValidatingCoupon}
                       >
-                        {isValidatingCoupon ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Zastosuj'}
+                        {isValidatingCoupon ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          "Zastosuj"
+                        )}
                       </Button>
                     </div>
                     {couponDiscount > 0 && (
@@ -649,7 +783,11 @@ export default function CheckoutPage() {
                     </div>
                     <div className="flex justify-between">
                       <span>Dostawa</span>
-                      <span>{calculateShipping() === 0 ? 'Darmowa' : formatPrice(calculateShipping())}</span>
+                      <span>
+                        {calculateShipping() === 0
+                          ? "Darmowa"
+                          : formatPrice(calculateShipping())}
+                      </span>
                     </div>
                     {couponDiscount > 0 && (
                       <div className="flex justify-between text-green-600">
@@ -676,12 +814,12 @@ export default function CheckoutPage() {
                         Składanie zamówienia...
                       </>
                     ) : (
-                      'Złóż zamówienie'
+                      "Złóż zamówienie"
                     )}
                   </Button>
 
                   <p className="text-xs text-muted-foreground text-center">
-                    Klikając "Złóż zamówienie" akceptujesz nasze warunki sprzedaży
+                    Klikając Złóż zamówienie akceptujesz nasze warunki sprzedaży
                   </p>
                 </CardContent>
               </Card>
