@@ -28,10 +28,10 @@ export function Footer() {
           <FooterSection
             title="Obsługa klienta"
             links={[
-              { label: "Kontakt", href: "#" },
+              { label: "Kontakt", href: "/contact" },
               { label: "Dostawa i płatność", href: "/delivery" },
               { label: "Zwroty i reklamacje", href: "/returns" },
-              { label: "Regulamin", href: "#" },
+              { label: "Regulamin", href: "/terms" },
               { label: "Polityka prywatności", href: "/privacy-policy" },
             ]}
           />
