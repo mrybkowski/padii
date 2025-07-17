@@ -7,9 +7,6 @@ export function FooterBottom() {
           Regulamin
         </a>
         <a href="#" className="hover:text-white transition-colors">
-          Prywatność
-        </a>
-        <a href="#" className="hover:text-white transition-colors">
           Cookies
         </a>
       </div>

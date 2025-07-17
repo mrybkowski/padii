@@ -32,7 +32,7 @@ export function Footer() {
               { label: "Dostawa i płatność", href: "#" },
               { label: "Zwroty i reklamacje", href: "#" },
               { label: "Regulamin", href: "#" },
-              { label: "Polityka prywatności", href: "#" },
+              { label: "Polityka prywatności", href: "/privacy-policy" },
             ]}
           />
           <FooterContact />

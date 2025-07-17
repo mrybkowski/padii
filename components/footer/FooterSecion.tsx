@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { FooterSocials } from "./FooterSocial";
 
 type FooterSectionProps =
@@ -33,9 +34,12 @@ export function FooterSection(props: FooterSectionProps) {
       <ul className="space-y-2 text-gray-400">
         {props.links.map((link, index) => (
           <li key={index}>
-            <a href={link.href} className="hover:text-white transition-colors">
+            <Link
+              href={link.href}
+              className="hover:text-white transition-colors"
+            >
               {link.label}
-            </a>
+            </Link>
           </li>
         ))}
       </ul>
