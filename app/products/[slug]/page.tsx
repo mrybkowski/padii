@@ -86,7 +86,7 @@ export default function ProductPage() {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
-        <div className="container mx-auto px-4 py-8">
+        <div className="max-w-7xl mx-auto px-4 py-8">
           <div className="animate-pulse">
             <div className="grid lg:grid-cols-2 gap-8">
               <div className="bg-gray-300 aspect-square rounded-lg"></div>
@@ -106,7 +106,7 @@ export default function ProductPage() {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
-        <div className="container mx-auto px-4 py-8 text-center">
+        <div className="max-w-7xl mx-auto px-4 py-8 text-center">
           <h1 className="text-2xl font-bold mb-4">Produkt nie znaleziony</h1>
           <Button asChild>
             <Link href="/products">Powrót do produktów</Link>
@@ -129,7 +129,7 @@ export default function ProductPage() {
     <div className="min-h-screen bg-gray-50">
       <Header />
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Breadcrumb */}
         <nav className="mb-8 text-sm text-muted-foreground">
           <Link href="/" className="hover:text-primary">

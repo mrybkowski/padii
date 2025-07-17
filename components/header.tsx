@@ -1,25 +1,19 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { 
-  Search, 
-  ShoppingCart, 
-  Menu, 
-  Heart,
-  Store
-} from 'lucide-react';
-import { useCart } from '@/hooks/use-cart';
-import { useWishlist } from '@/hooks/use-wishlist';
-import { CartSheet } from './cart-sheet';
-import { WishlistSheet } from './wishlist-sheet';
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Search, ShoppingCart, Menu, Heart, Store } from "lucide-react";
+import { useCart } from "@/hooks/use-cart";
+import { useWishlist } from "@/hooks/use-wishlist";
+import { CartSheet } from "./cart-sheet";
+import { WishlistSheet } from "./wishlist-sheet";
 
 export function Header() {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const { cart, refreshCart } = useCart();
   const { getWishlistCount } = useWishlist();
@@ -31,7 +25,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto px-4">
+      <div className="max-w-7xl mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
@@ -41,16 +35,28 @@ export function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
-            <Link href="/" className="text-sm font-medium hover:text-primary transition-colors">
+            <Link
+              href="/"
+              className="text-sm font-medium hover:text-primary transition-colors"
+            >
               Strona główna
             </Link>
-            <Link href="/products" className="text-sm font-medium hover:text-primary transition-colors">
+            <Link
+              href="/products"
+              className="text-sm font-medium hover:text-primary transition-colors"
+            >
               Produkty
             </Link>
-            <Link href="/categories" className="text-sm font-medium hover:text-primary transition-colors">
+            <Link
+              href="/categories"
+              className="text-sm font-medium hover:text-primary transition-colors"
+            >
               Kategorie
             </Link>
-            <Link href="/contact" className="text-sm font-medium hover:text-primary transition-colors">
+            <Link
+              href="/contact"
+              className="text-sm font-medium hover:text-primary transition-colors"
+            >
               Kontakt
             </Link>
           </nav>
@@ -79,14 +85,18 @@ export function Header() {
 
             {/* Wishlist */}
             <WishlistSheet>
-              <Button variant="ghost" size="icon" className="hidden md:flex relative">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="hidden md:flex relative"
+              >
                 <Heart className="h-5 w-5" />
                 {getWishlistCount() > 0 && (
-                  <Badge 
-                    variant="destructive" 
+                  <Badge
+                    variant="destructive"
                     className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
                   >
-                    {getWishlistCount() > 99 ? '99+' : getWishlistCount()}
+                    {getWishlistCount() > 99 ? "99+" : getWishlistCount()}
                   </Badge>
                 )}
               </Button>
@@ -97,11 +107,11 @@ export function Header() {
               <Button variant="ghost" size="icon" className="relative">
                 <ShoppingCart className="h-5 w-5" />
                 {cart.itemCount > 0 && (
-                  <Badge 
-                    variant="destructive" 
+                  <Badge
+                    variant="destructive"
                     className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
                   >
-                    {cart.itemCount > 99 ? '99+' : cart.itemCount}
+                    {cart.itemCount > 99 ? "99+" : cart.itemCount}
                   </Badge>
                 )}
               </Button>
@@ -116,16 +126,28 @@ export function Header() {
               </SheetTrigger>
               <SheetContent side="right" className="w-[300px] sm:w-[400px]">
                 <nav className="flex flex-col space-y-4 mt-8">
-                  <Link href="/" className="text-lg font-medium hover:text-primary transition-colors">
+                  <Link
+                    href="/"
+                    className="text-lg font-medium hover:text-primary transition-colors"
+                  >
                     Strona główna
                   </Link>
-                  <Link href="/products" className="text-lg font-medium hover:text-primary transition-colors">
+                  <Link
+                    href="/products"
+                    className="text-lg font-medium hover:text-primary transition-colors"
+                  >
                     Produkty
                   </Link>
-                  <Link href="/categories" className="text-lg font-medium hover:text-primary transition-colors">
+                  <Link
+                    href="/categories"
+                    className="text-lg font-medium hover:text-primary transition-colors"
+                  >
                     Kategorie
                   </Link>
-                  <Link href="/contact" className="text-lg font-medium hover:text-primary transition-colors">
+                  <Link
+                    href="/contact"
+                    className="text-lg font-medium hover:text-primary transition-colors"
+                  >
                     Kontakt
                   </Link>
                   <hr className="my-4" />
