@@ -1,17 +1,23 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Heart, ShoppingBag, Trash2, ShoppingCart } from 'lucide-react';
-import { useWishlist } from '@/hooks/use-wishlist';
-import { useCart } from '@/hooks/use-cart';
-import { useEffect } from 'react';
-import { Product, wordpressAPI } from '@/lib/wordpress';
+import { useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Heart, ShoppingBag, Trash2, ShoppingCart } from "lucide-react";
+import { useWishlist } from "@/hooks/use-wishlist";
+import { useCart } from "@/hooks/use-cart";
+import { useEffect } from "react";
+import { Product, wordpressAPI } from "@/lib/wordpress";
 
 interface WishlistSheetProps {
   children: React.ReactNode;
@@ -33,14 +39,14 @@ export function WishlistSheet({ children }: WishlistSheetProps) {
 
       setIsLoading(true);
       try {
-        const productIds = wishlist.map(item => item.productId);
+        const productIds = wishlist.map((item) => item.productId);
         const allProducts = await wordpressAPI.getProducts({ per_page: 100 });
-        const wishlistProducts = allProducts.filter(product => 
+        const wishlistProducts = allProducts.filter((product) =>
           productIds.includes(product.id)
         );
         setProducts(wishlistProducts);
       } catch (error) {
-        console.error('Error loading wishlist products:', error);
+        console.error("Error loading wishlist products:", error);
         setProducts([]);
       } finally {
         setIsLoading(false);
@@ -54,9 +60,9 @@ export function WishlistSheet({ children }: WishlistSheetProps) {
 
   const formatPrice = (price: string) => {
     const numPrice = parseFloat(price);
-    return new Intl.NumberFormat('pl-PL', {
-      style: 'currency',
-      currency: 'PLN'
+    return new Intl.NumberFormat("pl-PL", {
+      style: "currency",
+      currency: "PLN",
     }).format(numPrice);
   };
 
@@ -70,9 +76,7 @@ export function WishlistSheet({ children }: WishlistSheetProps) {
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
-      <SheetTrigger asChild>
-        {children}
-      </SheetTrigger>
+      <SheetTrigger asChild>{children}</SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-lg">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
@@ -88,8 +92,12 @@ export function WishlistSheet({ children }: WishlistSheetProps) {
         ) : wishlist.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <Heart className="h-16 w-16 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Lista życzeń jest pusta</h3>
-            <p className="text-muted-foreground mb-6">Dodaj produkty do listy życzeń klikając ikonę serca</p>
+            <h3 className="text-lg font-semibold mb-2">
+              Lista życzeń jest pusta
+            </h3>
+            <p className="text-muted-foreground mb-6">
+              Dodaj produkty do listy życzeń klikając ikonę serca
+            </p>
             <Button asChild onClick={() => setIsOpen(false)}>
               <Link href="/products">Przeglądaj produkty</Link>
             </Button>
@@ -99,16 +107,25 @@ export function WishlistSheet({ children }: WishlistSheetProps) {
             <ScrollArea className="flex-1 pr-6">
               <div className="space-y-4">
                 {products.map((product) => {
-                  const regularPrice = parseFloat(product.regular_price || '0');
-                  const salePrice = parseFloat(product.sale_price || '0');
+                  const regularPrice = parseFloat(product.regular_price || "0");
+                  const salePrice = parseFloat(product.sale_price || "0");
                   const isOnSale = salePrice > 0 && salePrice < regularPrice;
-                  const discount = isOnSale ? Math.round(((regularPrice - salePrice) / regularPrice) * 100) : 0;
+                  const discount = isOnSale
+                    ? Math.round(
+                        ((regularPrice - salePrice) / regularPrice) * 100
+                      )
+                    : 0;
 
                   return (
-                    <div key={product.id} className="flex gap-4 p-4 border rounded-lg">
+                    <div
+                      key={product.id}
+                      className="flex gap-4 p-4 border rounded-lg"
+                    >
                       <div className="relative h-16 w-16 flex-shrink-0">
                         <Image
-                          src={product.images[0]?.src || '/placeholder-product.jpg'}
+                          src={
+                            product.images[0]?.src || "/placeholder-product.jpg"
+                          }
                           alt={product.images[0]?.alt || product.name}
                           fill
                           className="object-cover rounded"
@@ -120,22 +137,31 @@ export function WishlistSheet({ children }: WishlistSheetProps) {
                           </Badge>
                         )}
                       </div>
-                      
+
                       <div className="flex-1 space-y-2">
                         <div className="flex justify-between items-start">
                           <div>
-                            <Link href={`/products/${product.slug}`} onClick={() => setIsOpen(false)}>
+                            <Link
+                              href={`/products/${product.slug}`}
+                              onClick={() => setIsOpen(false)}
+                            >
                               <h4 className="font-medium text-sm leading-tight line-clamp-2 hover:text-primary transition-colors">
                                 {product.name}
                               </h4>
                             </Link>
                             {product.categories.length > 0 && (
                               <div className="flex gap-1 mt-1">
-                                {product.categories.slice(0, 2).map((category) => (
-                                  <Badge key={category.id} variant="outline" className="text-xs">
-                                    {category.name}
-                                  </Badge>
-                                ))}
+                                {product.categories
+                                  .slice(0, 2)
+                                  .map((category) => (
+                                    <Badge
+                                      key={category.id}
+                                      variant="outline"
+                                      className="text-xs"
+                                    >
+                                      {category.name}
+                                    </Badge>
+                                  ))}
                               </div>
                             )}
                           </div>
@@ -148,7 +174,7 @@ export function WishlistSheet({ children }: WishlistSheetProps) {
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
-                        
+
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             {isOnSale ? (
@@ -166,17 +192,17 @@ export function WishlistSheet({ children }: WishlistSheetProps) {
                               </span>
                             )}
                           </div>
-                          
+
                           <Button
                             size="sm"
                             onClick={() => handleAddToCart(product)}
-                            disabled={product.stock_status !== 'instock'}
+                            disabled={product.stock_status !== "instock"}
                             className="h-8 text-xs"
                           >
                             {isInCart(product.id) ? (
                               <>
-                                <ShoppingCart className="h-3 w-3 mr-1" />
-                                W koszyku
+                                <ShoppingCart className="h-3 w-3 mr-1" />W
+                                koszyku
                               </>
                             ) : (
                               <>
@@ -189,10 +215,12 @@ export function WishlistSheet({ children }: WishlistSheetProps) {
 
                         {/* Stock status */}
                         <div className="text-xs">
-                          {product.stock_status === 'instock' ? (
+                          {product.stock_status === "instock" ? (
                             <span className="text-green-600">✓ Dostępny</span>
                           ) : (
-                            <span className="text-red-600">✗ Brak w magazynie</span>
+                            <span className="text-red-600">
+                              ✗ Brak w magazynie
+                            </span>
                           )}
                         </div>
                       </div>
@@ -201,24 +229,24 @@ export function WishlistSheet({ children }: WishlistSheetProps) {
                 })}
               </div>
             </ScrollArea>
-            
-            <div className="border-t pt-4 space-y-3">
+
+            <div className="border-t py-4 space-y-3">
               <div className="flex justify-between items-center text-sm text-muted-foreground">
                 <span>Produktów w liście:</span>
                 <span className="font-medium">{wishlist.length}</span>
               </div>
-              
+
               <div className="space-y-2">
-                <Button 
-                  className="w-full" 
+                <Button
+                  className="w-full"
                   size="lg"
                   onClick={() => setIsOpen(false)}
                   asChild
                 >
                   <Link href="/wishlist">Zobacz pełną listę</Link>
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full"
                   onClick={() => setIsOpen(false)}
                   asChild

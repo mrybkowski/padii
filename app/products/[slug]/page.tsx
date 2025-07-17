@@ -25,6 +25,7 @@ import { useCart } from "@/hooks/use-cart";
 import { Header } from "@/components/header";
 import { cn } from "@/lib/utils";
 import { useWishlist } from "@/hooks/use-wishlist";
+import { Footer } from "@/components/Footer";
 
 export default function ProductPage() {
   const params = useParams();
@@ -129,7 +130,7 @@ export default function ProductPage() {
     <div className="min-h-screen bg-gray-50">
       <Header />
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-8 pb-12">
         {/* Breadcrumb */}
         <nav className="mb-8 text-sm text-muted-foreground">
           <Link href="/" className="hover:text-primary">
@@ -479,6 +480,7 @@ export default function ProductPage() {
           </Tabs>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }

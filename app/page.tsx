@@ -22,6 +22,7 @@ import { Product, wordpressAPI } from "@/lib/wordpress";
 import { ProductSlider } from "@/components/product-slider";
 import { Header } from "@/components/header";
 import Image from "next/image";
+import { Footer } from "@/components/Footer";
 
 export default function Home() {
   const [allProducts, setAllProducts] = useState<Product[]>([]);
@@ -366,6 +367,7 @@ export default function Home() {
           </div>
         </section>
       )}
+      <Footer />
     </div>
   );
 }

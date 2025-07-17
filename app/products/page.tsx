@@ -19,6 +19,7 @@ import { Product, Category, wordpressAPI } from "@/lib/wordpress";
 import { ProductGrid } from "@/components/product-grid";
 import { Header } from "@/components/header";
 import { cn } from "@/lib/utils";
+import { Footer } from "@/components/Footer";
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -89,7 +90,7 @@ export default function ProductsPage() {
     <div className="min-h-screen bg-gray-50">
       <Header />
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8 pb-12">
         {/* Page Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Produkty</h1>
@@ -259,6 +260,7 @@ export default function ProductsPage() {
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }
