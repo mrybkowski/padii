@@ -41,6 +41,56 @@ export interface Category {
   };
 }
 
+export interface BLPaczkaPoint {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  postal_code: string;
+  coordinates: {
+    lat: number;
+    lng: number;
+  };
+  type: 'inpost' | 'orlen' | 'dpd' | 'ups' | 'fedex' | 'poczta';
+  available_24h: boolean;
+  services: string[];
+}
+
+export interface PlanetPayMethod {
+  id: string;
+  title: string;
+  description: string;
+  enabled: boolean;
+  method_title: string;
+  method_description: string;
+  settings: {
+    enabled: string;
+    title: string;
+    description: string;
+    [key: string]: any;
+  };
+}
+
+export interface ShippingZone {
+  id: number;
+  name: string;
+  order: number;
+  locations: Array<{
+    code: string;
+    type: string;
+  }>;
+  methods: Array<{
+    instance_id: number;
+    title: string;
+    order: number;
+    enabled: boolean;
+    method_id: string;
+    method_title: string;
+    settings: {
+      [key: string]: any;
+    };
+  }>;
+}
 const WP_API_URL = process.env.NEXT_PUBLIC_WP_API_URL!;
 const WP_CONSUMER_KEY = process.env.NEXT_PUBLIC_WP_CONSUMER_KEY!;
 const WP_CONSUMER_SECRET = process.env.NEXT_PUBLIC_WP_CONSUMER_SECRET!;
@@ -126,16 +176,103 @@ class WordPressAPI {
     });
   }
 
-  async getShippingMethods(): Promise<any[]> {
+  // BLPaczka integration
+  async getBLPaczkaPoints(params: {
+    city?: string;
+    postal_code?: string;
+    type?: string;
+    limit?: number;
+  } = {}): Promise<BLPaczkaPoint[]> {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined) {
+        searchParams.append(key, value.toString());
+      }
+    });
+    
+    const query = searchParams.toString();
+    return this.request(`/blpaczka/points${query ? `?${query}` : ""}`);
+  }
+
+  async getShippingZones(): Promise<ShippingZone[]> {
     return this.request("/shipping/zones");
   }
 
-  async getPaymentMethods(): Promise<any[]> {
+  async getShippingMethods(zoneId?: number): Promise<any[]> {
+    const endpoint = zoneId ? `/shipping/zones/${zoneId}/methods` : "/shipping/zones";
+    return this.request(endpoint);
+  }
+
+  // Planet Pay integration
+  async getPlanetPayMethods(): Promise<PlanetPayMethod[]> {
     return this.request("/payment_gateways");
+  }
+
+  async getPlanetPayMethod(methodId: string): Promise<PlanetPayMethod> {
+    return this.request(`/payment_gateways/${methodId}`);
+  }
+
+  async createPlanetPayPayment(paymentData: {
+    order_id: number;
+    payment_method: string;
+    amount: number;
+    currency: string;
+    return_url: string;
+    cancel_url: string;
+    [key: string]: any;
+  }) {
+    return this.request("/planet-pay/create-payment", {
+      method: "POST",
+      body: JSON.stringify(paymentData),
+    });
+  }
+
+  async getPlanetPayStatus(transactionId: string) {
+    return this.request(`/planet-pay/status/${transactionId}`);
   }
 
   async validateCoupon(code: string): Promise<any> {
     return this.request(`/coupons?code=${code}`);
+  }
+
+  // BLPaczka shipping methods
+  async createBLPaczkaShipment(shipmentData: {
+    order_id: number;
+    point_id?: string;
+    service_type: string;
+    sender: {
+      name: string;
+      phone: string;
+      email: string;
+      address: string;
+      city: string;
+      postal_code: string;
+    };
+    receiver: {
+      name: string;
+      phone: string;
+      email: string;
+      address?: string;
+      city?: string;
+      postal_code?: string;
+    };
+    package: {
+      weight: number;
+      dimensions: {
+        length: number;
+        width: number;
+        height: number;
+      };
+    };
+  }) {
+    return this.request("/blpaczka/shipments", {
+      method: "POST",
+      body: JSON.stringify(shipmentData),
+    });
+  }
+
+  async trackBLPaczkaShipment(trackingNumber: string) {
+    return this.request(`/blpaczka/track/${trackingNumber}`);
   }
 }
 

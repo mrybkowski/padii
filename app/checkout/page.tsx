@@ -32,6 +32,8 @@ import {
 import { useCart } from "@/hooks/use-cart";
 import { Header } from "@/components/Header";
 import { wordpressAPI } from "@/lib/wordpress";
+import { paymentManager } from "@/lib/payments";
+import { shippingManager } from "@/lib/shipping";
 import Link from "next/link";
 import { PaymentMethods } from "@/components/payment-methods";
 import { ShippingMethods } from "@/components/shipping-methods";
@@ -99,6 +101,16 @@ export default function CheckoutPage() {
 
   // Check if cart is empty and redirect only after component mounts
   useEffect(() => {
+    const initializeCheckout = async () => {
+      try {
+        // Załaduj metody płatności z Planet Pay
+        await paymentManager.loadPlanetPayMethods();
+      } catch (error) {
+        console.error('Error initializing checkout:', error);
+      }
+    };
+
+    initializeCheckout();
     setIsLoading(false);
 
     // Only redirect if cart is empty and we're not showing success
@@ -118,8 +130,11 @@ export default function CheckoutPage() {
   };
 
   const calculateShipping = () => {
-    if (formData.shipping_method === "express") return 25;
-    return cart.total >= 200 ? 0 : 15;
+    return shippingManager.calculateShippingCost(
+      formData.shipping_method,
+      2, // Średnia waga zamówienia
+      cart.total
+    );
   };
 
   const calculateTotal = () => {
@@ -189,6 +204,12 @@ export default function CheckoutPage() {
       return;
     }
 
+    // Sprawdź czy metoda dostawy wymaga punktu odbioru
+    const shippingMethod = shippingManager.getShippingMethods().find(m => m.id === formData.shipping_method);
+    if (shippingMethod?.requires_point && !selectedLocker) {
+      setOrderError("Proszę wybrać punkt odbioru dla wybranej metody dostawy");
+      return;
+    }
     setIsSubmitting(true);
     setOrderError(null);
 
@@ -225,21 +246,54 @@ export default function CheckoutPage() {
             key: "_order_total",
             value: calculateTotal().toString(),
           },
+          // Dodaj informacje o wybranym punkcie odbioru
+          ...(selectedLocker ? [{
+            key: "_selected_pickup_point",
+            value: JSON.stringify(selectedLocker),
+          }] : []),
+          // Dodaj informacje o metodzie BLPaczka
+          ...(shippingMethod?.blpaczka_service ? [{
+            key: "_blpaczka_service",
+            value: shippingMethod.blpaczka_service,
+          }] : []),
         ],
       };
 
       const order = await wordpressAPI.createOrder(orderData);
 
       if (order.id) {
+        // Utwórz przesyłkę w BLPaczka jeśli potrzeba
+        if (shippingMethod?.blpaczka_service) {
+          try {
+            await shippingManager.createShipment(order, selectedLocker);
+          } catch (error) {
+            console.error('Error creating shipment:', error);
+            // Nie przerywaj procesu zamówienia z powodu błędu przesyłki
+          }
+        }
+
+        // Przetwórz płatność przez Planet Pay
+        if (formData.payment_method !== 'cod' && formData.payment_method !== 'transfer') {
+          try {
+            const paymentResult = await paymentManager.processPayment(
+              formData.payment_method,
+              calculateTotal(),
+              order
+            );
+
+            if (paymentResult.success && paymentResult.redirectUrl) {
+              // Przekieruj do bramki płatności
+              window.location.href = paymentResult.redirectUrl;
+              return;
+            }
+          } catch (error) {
+            console.error('Payment processing error:', error);
+            setOrderError('Błąd podczas przetwarzania płatności. Zamówienie zostało złożone, ale płatność wymaga ręcznego przetworzenia.');
+          }
+        }
         clearCart();
         setOrderSuccess(true);
 
-        // Redirect to payment if needed
-        if (order.payment_url && formData.payment_method !== "cod") {
-          setTimeout(() => {
-            window.location.href = order.payment_url;
-          }, 2000);
-        }
       }
     } catch (error) {
       console.error("Order creation error:", error);
@@ -252,6 +306,11 @@ export default function CheckoutPage() {
   };
 
   const getPaymentMethodTitle = (method: string) => {
+    const paymentMethod = paymentManager.getPaymentMethods().find(m => m.id === method);
+    if (paymentMethod) {
+      return paymentMethod.name;
+    }
+
     switch (method) {
       case "cod":
         return "Płatność przy odbiorze";
@@ -265,6 +324,11 @@ export default function CheckoutPage() {
   };
 
   const getShippingMethodTitle = (method: string) => {
+    const shippingMethod = shippingManager.getShippingMethods().find(m => m.id === method);
+    if (shippingMethod) {
+      return shippingMethod.name;
+    }
+
     switch (method) {
       case "standard":
         return "Dostawa standardowa";

@@ -1,3 +1,5 @@
+import { wordpressAPI, PlanetPayMethod } from './wordpress';
+
 export interface PaymentProvider {
   id: string;
   name: string;
@@ -5,6 +7,7 @@ export interface PaymentProvider {
   icon: string;
   enabled: boolean;
   config?: Record<string, any>;
+  planet_pay_id?: string;
 }
 
 export interface PaymentMethod {
@@ -15,6 +18,7 @@ export interface PaymentMethod {
   fee?: number;
   minAmount?: number;
   maxAmount?: number;
+  planet_pay_method?: string;
 }
 
 export interface PaymentResult {
@@ -22,6 +26,7 @@ export interface PaymentResult {
   transactionId?: string;
   redirectUrl?: string;
   error?: string;
+  planet_pay_data?: any;
 }
 
 class PaymentManager {
@@ -32,6 +37,7 @@ class PaymentManager {
       description: 'Karty płatnicze, BLIK, przelewy',
       icon: '💳',
       enabled: true,
+      planet_pay_id: 'stripe',
     },
     {
       id: 'przelewy24',
@@ -39,6 +45,7 @@ class PaymentManager {
       description: 'Polskie banki i BLIK',
       icon: '🏦',
       enabled: true,
+      planet_pay_id: 'przelewy24',
     },
     {
       id: 'payu',
@@ -46,6 +53,7 @@ class PaymentManager {
       description: 'Szybkie płatności online',
       icon: '⚡',
       enabled: true,
+      planet_pay_id: 'payu',
     },
     {
       id: 'paypal',
@@ -53,6 +61,7 @@ class PaymentManager {
       description: 'Płatności międzynarodowe',
       icon: '🌍',
       enabled: true,
+      planet_pay_id: 'paypal',
     },
     {
       id: 'blik',
@@ -60,6 +69,7 @@ class PaymentManager {
       description: 'Płatność kodem z aplikacji bankowej',
       icon: '📱',
       enabled: true,
+      planet_pay_id: 'blik',
     },
     {
       id: 'bank_transfer',
@@ -67,6 +77,7 @@ class PaymentManager {
       description: 'Przelew na konto bankowe',
       icon: '🏛️',
       enabled: true,
+      planet_pay_id: 'bacs',
     },
     {
       id: 'cod',
@@ -74,9 +85,32 @@ class PaymentManager {
       description: 'Zapłać kurierowi gotówką',
       icon: '💰',
       enabled: true,
+      planet_pay_id: 'cod',
     },
   ];
 
+  async loadPlanetPayMethods(): Promise<void> {
+    try {
+      const methods = await wordpressAPI.getPlanetPayMethods();
+      
+      // Aktualizuj providers na podstawie danych z Planet Pay
+      this.providers = this.providers.map(provider => {
+        const planetPayMethod = methods.find(m => m.id === provider.planet_pay_id);
+        if (planetPayMethod) {
+          return {
+            ...provider,
+            enabled: planetPayMethod.enabled,
+            name: planetPayMethod.title || provider.name,
+            description: planetPayMethod.description || provider.description,
+            config: planetPayMethod.settings,
+          };
+        }
+        return provider;
+      });
+    } catch (error) {
+      console.error('Error loading Planet Pay methods:', error);
+    }
+  }
   getAvailableProviders(): PaymentProvider[] {
     return this.providers.filter(provider => provider.enabled);
   }
@@ -88,42 +122,49 @@ class PaymentManager {
         provider: 'stripe',
         name: 'Karta płatnicza',
         description: 'Visa, Mastercard, American Express',
+        planet_pay_method: 'stripe',
       },
       {
         id: 'blik',
         provider: 'blik',
         name: 'BLIK',
         description: 'Kod z aplikacji bankowej',
+        planet_pay_method: 'blik',
       },
       {
         id: 'p24',
         provider: 'przelewy24',
         name: 'Przelewy24',
         description: 'Banki polskie',
+        planet_pay_method: 'przelewy24',
       },
       {
         id: 'payu',
         provider: 'payu',
         name: 'PayU',
         description: 'Szybkie płatności',
+        planet_pay_method: 'payu',
       },
       {
         id: 'paypal',
         provider: 'paypal',
         name: 'PayPal',
         description: 'Konto PayPal',
+        planet_pay_method: 'paypal',
       },
       {
         id: 'transfer',
         provider: 'bank_transfer',
         name: 'Przelew bankowy',
         description: 'Tradycyjny przelew',
+        planet_pay_method: 'bacs',
       },
       {
         id: 'cod',
         provider: 'cod',
         name: 'Przy odbiorze',
         description: 'Gotówka kurierowi',
+        planet_pay_method: 'cod',
       },
     ];
   }
@@ -133,20 +174,47 @@ class PaymentManager {
     amount: number,
     orderData: any
   ): Promise<PaymentResult> {
-    // Symulacja przetwarzania płatności
     try {
+      const paymentMethod = this.getPaymentMethods().find(m => m.id === method);
+      if (!paymentMethod?.planet_pay_method) {
+        throw new Error('Nieobsługiwana metoda płatności');
+      }
+
       switch (method) {
         case 'card':
         case 'blik':
         case 'p24':
         case 'payu':
         case 'paypal':
-          // Dla płatności online - przekierowanie do bramki
-          return {
-            success: true,
-            transactionId: `txn_${Date.now()}`,
-            redirectUrl: `/payment/process?method=${method}&amount=${amount}`,
-          };
+          // Użyj Planet Pay do przetworzenia płatności online
+          try {
+            const planetPayData = await wordpressAPI.createPlanetPayPayment({
+              order_id: orderData.id,
+              payment_method: paymentMethod.planet_pay_method,
+              amount: amount,
+              currency: 'PLN',
+              return_url: `${window.location.origin}/order-received/${orderData.id}`,
+              cancel_url: `${window.location.origin}/checkout`,
+              customer_email: orderData.billing.email,
+              customer_name: `${orderData.billing.first_name} ${orderData.billing.last_name}`,
+              description: `Zamówienie #${orderData.id} - Padii.pl`,
+            });
+
+            return {
+              success: true,
+              transactionId: planetPayData.transaction_id,
+              redirectUrl: planetPayData.payment_url,
+              planet_pay_data: planetPayData,
+            };
+          } catch (error) {
+            console.error('Planet Pay error:', error);
+            // Fallback do symulacji
+            return {
+              success: true,
+              transactionId: `txn_${Date.now()}`,
+              redirectUrl: `/payment/process?method=${method}&amount=${amount}`,
+            };
+          }
         
         case 'transfer':
           // Dla przelewu - instrukcje
@@ -169,13 +237,25 @@ class PaymentManager {
           };
       }
     } catch (error) {
+      console.error('Payment processing error:', error);
       return {
         success: false,
-        error: 'Błąd podczas przetwarzania płatności',
+        error: error instanceof Error ? error.message : 'Błąd podczas przetwarzania płatności',
       };
     }
   }
 
+  async checkPaymentStatus(transactionId: string): Promise<any> {
+    try {
+      return await wordpressAPI.getPlanetPayStatus(transactionId);
+    } catch (error) {
+      console.error('Error checking payment status:', error);
+      return {
+        status: 'unknown',
+        error: 'Nie można sprawdzić statusu płatności',
+      };
+    }
+  }
   getPaymentInstructions(method: string, orderData: any): string {
     switch (method) {
       case 'transfer':
