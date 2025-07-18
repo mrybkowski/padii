@@ -23,6 +23,7 @@ import { ProductSlider } from "@/components/product-slider";
 import { Header } from "@/components/Header";
 import Image from "next/image";
 import { Footer } from "@/components/Footer";
+import { BlogSection } from "@/components/blog-section";
 
 export default function Home() {
   const [allProducts, setAllProducts] = useState<Product[]>([]);
@@ -380,6 +381,10 @@ export default function Home() {
           </div>
         </section>
       )}
+      
+      {/* Blog Section */}
+      <BlogSection />
+      
       <Footer />
     </div>
   );

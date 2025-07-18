@@ -33,6 +33,9 @@ import { useCart } from "@/hooks/use-cart";
 import { Header } from "@/components/Header";
 import { wordpressAPI } from "@/lib/wordpress";
 import Link from "next/link";
+import { PaymentMethods } from "@/components/payment-methods";
+import { ShippingMethods } from "@/components/shipping-methods";
+import { ParcelLocker } from "@/lib/shipping";
 
 interface CheckoutFormData {
   billing: {
@@ -73,6 +76,7 @@ export default function CheckoutPage() {
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedLocker, setSelectedLocker] = useState<ParcelLocker | undefined>();
 
   const [formData, setFormData] = useState<CheckoutFormData>({
     billing: {
@@ -562,114 +566,30 @@ export default function CheckoutPage() {
               </Card>
 
               {/* Shipping Methods */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Truck className="h-5 w-5" />
-                    Metoda dostawy
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <RadioGroup
-                    value={formData.shipping_method}
-                    onValueChange={(value) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        shipping_method: value,
-                      }))
-                    }
-                  >
-                    <div className="flex items-center space-x-2 p-3 border rounded-lg">
-                      <RadioGroupItem value="standard" id="standard" />
-                      <Label htmlFor="standard" className="flex-1">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <div className="font-medium">
-                              Dostawa standardowa
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              3-5 dni roboczych
-                            </div>
-                          </div>
-                          <div className="font-medium">
-                            {cart.total >= 200 ? "Darmowa" : formatPrice(15)}
-                          </div>
-                        </div>
-                      </Label>
-                    </div>
-
-                    <div className="flex items-center space-x-2 p-3 border rounded-lg">
-                      <RadioGroupItem value="express" id="express" />
-                      <Label htmlFor="express" className="flex-1">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <div className="font-medium">
-                              Dostawa ekspresowa
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              1-2 dni robocze
-                            </div>
-                          </div>
-                          <div className="font-medium">{formatPrice(25)}</div>
-                        </div>
-                      </Label>
-                    </div>
-                  </RadioGroup>
-                </CardContent>
-              </Card>
+              <ShippingMethods
+                selectedMethod={formData.shipping_method}
+                onMethodChange={(method) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    shipping_method: method,
+                  }))
+                }
+                cartValue={cart.total}
+                selectedLocker={selectedLocker}
+                onLockerChange={setSelectedLocker}
+              />
 
               {/* Payment Methods */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <CreditCard className="h-5 w-5" />
-                    Metoda płatności
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <RadioGroup
-                    value={formData.payment_method}
-                    onValueChange={(value) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        payment_method: value,
-                      }))
-                    }
-                  >
-                    <div className="flex items-center space-x-2 p-3 border rounded-lg">
-                      <RadioGroupItem value="cod" id="cod" />
-                      <Label htmlFor="cod" className="flex-1">
-                        <div className="font-medium">
-                          Płatność przy odbiorze
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          Zapłać gotówką kurierowi
-                        </div>
-                      </Label>
-                    </div>
-
-                    <div className="flex items-center space-x-2 p-3 border rounded-lg">
-                      <RadioGroupItem value="bacs" id="bacs" />
-                      <Label htmlFor="bacs" className="flex-1">
-                        <div className="font-medium">Przelew bankowy</div>
-                        <div className="text-sm text-muted-foreground">
-                          Tradycyjny przelew na konto
-                        </div>
-                      </Label>
-                    </div>
-
-                    <div className="flex items-center space-x-2 p-3 border rounded-lg">
-                      <RadioGroupItem value="stripe" id="stripe" />
-                      <Label htmlFor="stripe" className="flex-1">
-                        <div className="font-medium">Karta płatnicza</div>
-                        <div className="text-sm text-muted-foreground">
-                          Visa, Mastercard, BLIK
-                        </div>
-                      </Label>
-                    </div>
-                  </RadioGroup>
-                </CardContent>
-              </Card>
+              <PaymentMethods
+                selectedMethod={formData.payment_method}
+                onMethodChange={(method) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    payment_method: method,
+                  }))
+                }
+                amount={calculateTotal()}
+              />
 
               {/* Order Notes */}
               <Card>
