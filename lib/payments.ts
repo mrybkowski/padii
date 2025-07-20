@@ -186,35 +186,11 @@ class PaymentManager {
         case 'p24':
         case 'payu':
         case 'paypal':
-          // Użyj Planet Pay do przetworzenia płatności online
-          try {
-            const planetPayData = await wordpressAPI.createPlanetPayPayment({
-              order_id: orderData.id,
-              payment_method: paymentMethod.planet_pay_method,
-              amount: amount,
-              currency: 'PLN',
-              return_url: `${window.location.origin}/order-received/${orderData.id}`,
-              cancel_url: `${window.location.origin}/checkout`,
-              customer_email: orderData.billing.email,
-              customer_name: `${orderData.billing.first_name} ${orderData.billing.last_name}`,
-              description: `Zamówienie #${orderData.id} - Padii.pl`,
-            });
-
-            return {
-              success: true,
-              transactionId: planetPayData.transaction_id,
-              redirectUrl: planetPayData.payment_url,
-              planet_pay_data: planetPayData,
-            };
-          } catch (error) {
-            console.error('Planet Pay error:', error);
-            // Fallback do symulacji
-            return {
-              success: true,
-              transactionId: `txn_${Date.now()}`,
-              redirectUrl: `/payment/process?method=${method}&amount=${amount}`,
-            };
-          }
+          // Płatności Planet Pay są teraz obsługiwane bezpośrednio w checkout
+          return {
+            success: true,
+            transactionId: `txn_${Date.now()}`,
+          };
         
         case 'transfer':
           // Dla przelewu - instrukcje
@@ -247,7 +223,11 @@ class PaymentManager {
 
   async checkPaymentStatus(transactionId: string): Promise<any> {
     try {
-      return await wordpressAPI.getPlanetPayStatus(transactionId);
+      const response = await fetch(`/api/planetpay/payment/${transactionId}/status`);
+      if (!response.ok) {
+        throw new Error('Failed to check payment status');
+      }
+      return await response.json();
     } catch (error) {
       console.error('Error checking payment status:', error);
       return {

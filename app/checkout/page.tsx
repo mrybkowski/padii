@@ -39,6 +39,7 @@ import Link from "next/link";
 import { PaymentMethods } from "@/components/payment-methods";
 import { ShippingMethods } from "@/components/shipping-methods";
 import { ParcelLocker } from "@/lib/shipping";
+import { planetPayAPI } from "@/lib/planetpay";
 
 interface CheckoutFormData {
   billing: {
@@ -88,6 +89,7 @@ export default function CheckoutPage() {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [isLoadingPoints, setIsLoadingPoints] = useState(false);
   const [isLoadingPaymentMethods, setIsLoadingPaymentMethods] = useState(false);
+  const [planetPayToken, setPlanetPayToken] = useState<string | null>(null);
   const [selectedCourier, setSelectedCourier] = useState<string>("dhl");
   const [selectedPoint, setSelectedPoint] = useState<DeliveryPoint | null>(
     null
@@ -269,21 +271,39 @@ export default function CheckoutPage() {
     setOrderError(null);
 
     try {
-      const response = await fetch("/api/planetpay/methods");
+      // Pobierz token autoryzacyjny
+      const authResponse = await fetch("/api/planetpay/auth", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          customerEmail: formData.billing.email || "guest@padii.pl",
+        }),
+      });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to fetch payment methods");
+      if (!authResponse.ok) {
+        throw new Error("Failed to authenticate with Planet Pay");
       }
 
-      const data = await response.json();
-      console.log("Payment Methods Data: ", data);
-      if (data) {
-        setPaymentMethods(data?.methods || []);
-        if (data?.methods.length > 0) {
+      const authData = await authResponse.json();
+      setPlanetPayToken(authData.access_token);
+
+      // Pobierz dostępne metody płatności
+      const methodsResponse = await fetch("/api/planetpay/methods");
+      
+      if (!methodsResponse.ok) {
+        throw new Error("Failed to fetch payment methods");
+      }
+
+      const methodsData = await methodsResponse.json();
+      
+      if (methodsData?.methods) {
+        setPaymentMethods(methodsData.methods);
+        if (methodsData.methods.length > 0) {
           setFormData((prev) => ({
             ...prev,
-            payment_method: `planetpay_${data.methods[0].method.toLowerCase()}`,
+            payment_method: `planetpay_${methodsData.methods[0].method.toLowerCase()}`,
           }));
         }
       } else {
@@ -459,15 +479,16 @@ export default function CheckoutPage() {
           formData.payment_method !== "transfer"
         ) {
           try {
-            const paymentResult = await paymentManager.processPayment(
-              formData.payment_method,
-              calculateTotal(),
-              order
-            );
+            const paymentResult = await processPlanetPayPayment(order);
 
             if (paymentResult.success && paymentResult.redirectUrl) {
               // Przekieruj do bramki płatności
               window.location.href = paymentResult.redirectUrl;
+              return;
+            } else if (paymentResult.success) {
+              // Płatność zakończona sukcesem
+              clearCart();
+              setOrderSuccess(true);
               return;
             }
           } catch (error) {
@@ -480,14 +501,6 @@ export default function CheckoutPage() {
         clearCart();
         setOrderSuccess(true);
 
-        if (
-          formData.payment_method.startsWith("planetpay_") &&
-          order.payment_url
-        ) {
-          setTimeout(() => {
-            window.location.href = order.payment_url;
-          }, 2000);
-        }
       }
     } catch (error) {
       console.error("Order creation error:", error);
@@ -496,6 +509,86 @@ export default function CheckoutPage() {
       );
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const processPlanetPayPayment = async (order: any) => {
+    try {
+      const paymentMethod = formData.payment_method.replace("planetpay_", "").toUpperCase();
+      
+      const paymentRequest = {
+        channel: "WEBAPI" as const,
+        method: paymentMethod as any,
+        merchant: {
+          merchantId: process.env.NEXT_PUBLIC_PLANET_PAY_MERCHANT_ID!,
+          name: "Padii.pl",
+          url: window.location.origin,
+          redirectURL: `${window.location.origin}/order-received/${order.id}`,
+        },
+        customer: {
+          email: formData.billing.email,
+          name: `${formData.billing.first_name} ${formData.billing.last_name}`,
+          firstName: formData.billing.first_name,
+          lastName: formData.billing.last_name,
+          billing: {
+            street: formData.billing.address_1,
+            postal: formData.billing.postcode,
+            city: formData.billing.city,
+            country: formData.billing.country,
+          },
+        },
+        order: {
+          amount: Math.round(calculateTotal() * 100), // Planet Pay wymaga kwoty w groszach
+          currency: "PLN",
+          extOrderId: order.id.toString(),
+          description: `Zamówienie #${order.id} - Padii.pl`,
+        },
+        options: {
+          transKind: "AUTH" as const,
+          language: "pl",
+          validTime: 3600, // 1 godzina na płatność
+        },
+      };
+
+      // Dodaj specyficzne dane dla różnych metod płatności
+      if (paymentMethod === "BLIK") {
+        const blikCode = (document.getElementById("blik-code") as HTMLInputElement)?.value;
+        if (blikCode && blikCode.length === 6) {
+          paymentRequest.instrument = {
+            type: "BLIK_CODE",
+            code: blikCode,
+          } as any;
+        }
+      }
+
+      const response = await fetch("/api/planetpay/payment", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(paymentRequest),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Payment processing failed");
+      }
+
+      const paymentData = await response.json();
+
+      if (paymentData.status === "COMPLETED") {
+        return { success: true };
+      } else if (paymentData.redirectURL) {
+        return { success: true, redirectUrl: paymentData.redirectURL };
+      } else if (paymentData.status === "PENDING") {
+        // Dla BLIK lub innych metod wymagających dodatkowych kroków
+        return { success: true };
+      } else {
+        throw new Error(paymentData.rejectInfo || "Payment failed");
+      }
+    } catch (error) {
+      console.error("Planet Pay payment error:", error);
+      throw error;
     }
   };
 
@@ -925,7 +1018,7 @@ export default function CheckoutPage() {
                       <Loader2 className="h-6 w-6 animate-spin" />
                       <span className="ml-2">Ładowanie metod płatności...</span>
                     </div>
-                  ) : paymentMethods ? (
+                  ) : paymentMethods.length > 0 ? (
                     <RadioGroup
                       value={formData.payment_method}
                       onValueChange={(value) =>
@@ -967,6 +1060,24 @@ export default function CheckoutPage() {
                             </Label>
                           </div>
                         ))}
+                        
+                        {/* BLIK Code Input */}
+                        {formData.payment_method === "planetpay_blik" && (
+                          <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                            <div className="flex items-center gap-2 mb-3">
+                              <span className="font-medium text-blue-900">Kod BLIK</span>
+                            </div>
+                            <Input
+                              id="blik-code"
+                              placeholder="Wprowadź 6-cyfrowy kod BLIK"
+                              maxLength={6}
+                              className="text-center text-lg tracking-widest font-mono"
+                            />
+                            <p className="text-sm text-blue-700 mt-2">
+                              Wygeneruj kod w aplikacji bankowej i wprowadź go powyżej
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </RadioGroup>
                   ) : (

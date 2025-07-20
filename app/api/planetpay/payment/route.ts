@@ -8,47 +8,20 @@ export async function POST(req: NextRequest) {
   try {
     const paymentRequest = await req.json();
 
-    // Najpierw uzyskaj token dostępu
-    const authResponse = await fetch(
-      `${PLANET_PAY_API_URL}/v1/ecommerce/auth`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          accept: "application/json",
-        },
-        body: JSON.stringify({
-          resource: "PAYMENT",
-          channel: "WEBAPI",
-          secret: PLANET_PAY_SECRET,
-          merchant: { merchantId: PLANET_PAY_MERCHANT_ID },
-          ...(paymentRequest.customer?.email && {
-            customer: { email: paymentRequest.customer.email },
-          }),
-        }),
-      }
-    );
-
-    if (!authResponse.ok) {
-      const error = await authResponse.text();
-      return NextResponse.json(
-        { error: `Authentication failed: ${authResponse.status} - ${error}` },
-        { status: authResponse.status }
-      );
-    }
-
-    const authData = await authResponse.json();
-    const accessToken = authData.access_token;
-
-    // Teraz utwórz płatność
+    // Utwórz płatność bezpośrednio
     const response = await fetch(`${PLANET_PAY_API_URL}/v1/ecommerce/payment`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
         accept: "application/json",
       },
-      body: JSON.stringify(paymentRequest),
+      body: JSON.stringify({
+        ...paymentRequest,
+        auth: {
+          secret: PLANET_PAY_SECRET,
+          merchant: { merchantId: PLANET_PAY_MERCHANT_ID },
+        },
+      }),
     });
 
     if (!response.ok) {
