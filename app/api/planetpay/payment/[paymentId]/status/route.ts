@@ -4,14 +4,16 @@ const PLANET_PAY_API_URL = process.env.PLANET_PAY_API_URL || "";
 const PLANET_PAY_SECRET = process.env.PLANET_PAY_SECRET || "";
 const PLANET_PAY_MERCHANT_ID = process.env.PLANET_PAY_MERCHANT_ID || "";
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { paymentId: string } }
-) {
+export async function GET(req: NextRequest) {
   try {
-    const { paymentId } = params;
+    // Extract paymentId from the URL path
+    const url = new URL(req.url);
+    const segments = url.pathname.split("/");
+    // Example path: /api/planetpay/payment/[paymentId]/status
+    const paymentIndex = segments.indexOf("payment");
+    const paymentId = segments[paymentIndex + 1];
 
-    // Najpierw uzyskaj token dostępu
+    // Get auth token
     const authResponse = await fetch(
       `${PLANET_PAY_API_URL}/v1/ecommerce/auth`,
       {
@@ -40,7 +42,7 @@ export async function GET(
     const authData = await authResponse.json();
     const accessToken = authData.access_token;
 
-    // Pobierz status płatności
+    // Fetch payment status
     const response = await fetch(
       `${PLANET_PAY_API_URL}/v1/ecommerce/payment/${paymentId}/status`,
       {

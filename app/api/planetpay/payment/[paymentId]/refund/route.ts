@@ -4,15 +4,19 @@ const PLANET_PAY_API_URL = process.env.PLANET_PAY_API_URL || "";
 const PLANET_PAY_SECRET = process.env.PLANET_PAY_SECRET || "";
 const PLANET_PAY_MERCHANT_ID = process.env.PLANET_PAY_MERCHANT_ID || "";
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: { paymentId: string } }
-) {
+export async function POST(req: NextRequest) {
   try {
-    const { paymentId } = params;
+    // Extract paymentId from URL path
+    const url = new URL(req.url);
+    const segments = url.pathname.split("/");
+    // Example pathname: /api/planetpay/payment/[paymentId]/refund
+    // paymentId is after "payment"
+    const paymentIndex = segments.indexOf("payment");
+    const paymentId = segments[paymentIndex + 1];
+
     const refundRequest = await req.json();
 
-    // Najpierw uzyskaj token dostępu
+    // Authenticate to get access token
     const authResponse = await fetch(
       `${PLANET_PAY_API_URL}/v1/ecommerce/auth`,
       {
@@ -41,7 +45,7 @@ export async function POST(
     const authData = await authResponse.json();
     const accessToken = authData.access_token;
 
-    // Wykonaj zwrot
+    // Perform refund request
     const response = await fetch(
       `${PLANET_PAY_API_URL}/v1/ecommerce/payment/${paymentId}/refund`,
       {

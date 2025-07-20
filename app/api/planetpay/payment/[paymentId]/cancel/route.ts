@@ -4,15 +4,17 @@ const PLANET_PAY_API_URL = process.env.PLANET_PAY_API_URL || "";
 const PLANET_PAY_SECRET = process.env.PLANET_PAY_SECRET || "";
 const PLANET_PAY_MERCHANT_ID = process.env.PLANET_PAY_MERCHANT_ID || "";
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: { paymentId: string } }
-) {
+export async function POST(req: NextRequest) {
   try {
-    const { paymentId } = params;
+    // Extract paymentId from URL path
+    // The pathname looks like "/api/planetpay/payment/[paymentId]/cancel"
+    const url = new URL(req.url);
+    const segments = url.pathname.split("/");
+    const paymentId = segments[segments.indexOf("payment") + 1]; // "paymentId"
+
     const cancelRequest = await req.json();
 
-    // Najpierw uzyskaj token dostępu
+    // Authenticate to get token
     const authResponse = await fetch(
       `${PLANET_PAY_API_URL}/v1/ecommerce/auth`,
       {
@@ -41,7 +43,7 @@ export async function POST(
     const authData = await authResponse.json();
     const accessToken = authData.access_token;
 
-    // Anuluj płatność
+    // Cancel payment
     const response = await fetch(
       `${PLANET_PAY_API_URL}/v1/ecommerce/payment/${paymentId}/cancel`,
       {
