@@ -124,8 +124,6 @@ export default function ProductPage() {
     ? Math.round(((regularPrice - salePrice) / regularPrice) * 100)
     : 0;
 
-  console.log("product: ", product);
-
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
