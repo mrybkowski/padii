@@ -3,8 +3,8 @@ const nextConfig = {
   output: 'export',
    swcMinify: true,
   experimental: {
-    forceSwcTransforms: true,
-  },
+    forceSwcTransforms: true
+  }
   eslint: {
     ignoreDuringBuilds: true,
   },
