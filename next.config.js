@@ -4,7 +4,7 @@ const nextConfig = {
    swcMinify: true,
   experimental: {
     forceSwcTransforms: true
-  }
+  },
   eslint: {
     ignoreDuringBuilds: true,
   },
