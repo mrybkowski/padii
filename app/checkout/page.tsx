@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -28,6 +27,8 @@ import {
   AlertCircle,
   CheckCircle,
   Loader2,
+  Package,
+  MapPin,
 } from "lucide-react";
 import { useCart } from "@/hooks/use-cart";
 import { Header } from "@/components/Header";
@@ -66,6 +67,8 @@ interface CheckoutFormData {
   shipping_method: string;
   customer_note?: string;
 }
+import type { DeliveryPoint } from "@/lib/blpaczka";
+import type { PaymentMethod } from "@/lib/planetpay";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -78,9 +81,19 @@ export default function CheckoutPage() {
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedLocker, setSelectedLocker] = useState<ParcelLocker | undefined>();
+  const [selectedLocker, setSelectedLocker] = useState<
+    ParcelLocker | undefined
+  >();
+  const [deliveryPoints, setDeliveryPoints] = useState<DeliveryPoint[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [isLoadingPoints, setIsLoadingPoints] = useState(false);
+  const [isLoadingPaymentMethods, setIsLoadingPaymentMethods] = useState(false);
+  const [selectedCourier, setSelectedCourier] = useState<string>("dhl");
+  const [selectedPoint, setSelectedPoint] = useState<DeliveryPoint | null>(
+    null
+  );
 
-  const [formData, setFormData] = useState<CheckoutFormData>({
+  const [formData, setFormData] = useState({
     billing: {
       first_name: "",
       last_name: "",
@@ -94,26 +107,78 @@ export default function CheckoutPage() {
       company: "",
     },
     shipping: {},
-    payment_method: "cod",
-    shipping_method: "standard",
+    payment_method: "planetpay_card",
+    shipping_method: "blpaczka",
     customer_note: "",
+    delivery_point: "",
+    blpaczka_courier: "dhl",
   });
 
-  // Check if cart is empty and redirect only after component mounts
+  const parsePointData = (
+    html: string
+  ): Omit<DeliveryPoint, "courier_code"> => {
+    // Usuwamy tagi HTML i dzielimy tekst na linie
+    const text = html.replace(/<[^>]*>/g, "");
+    const lines = text
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line);
+
+    // Inicjalizujemy obiekt z domyślnymi wartościami
+    const point: any = {
+      id: "",
+      name: "",
+      address: "",
+      city: "",
+      postal_code: "",
+      opening_hours: "",
+    };
+
+    // Parsujemy poszczególne linie
+    lines.forEach((line) => {
+      if (line.startsWith("Kod punktu:")) {
+        point.id = line.replace("Kod punktu:", "").trim();
+      } else if (line.startsWith("Godziny otwarcia:")) {
+        point.opening_hours = line.replace("Godziny otwarcia:", "").trim();
+      } else if (/^\d{2}-\d{3}$/.test(line)) {
+        point.postal_code = line;
+      }
+      // Jeśli linia zawiera tylko tekst (bez dwukropka), to może to być miasto lub adres
+      else if (!line.includes(":")) {
+        if (!point.city) {
+          point.city = line;
+        } else if (!point.address) {
+          point.address = line;
+        }
+      }
+    });
+
+    // Nazwa punktu to pierwsza linia po usunięciu tagów
+    point.name = lines[0] || "";
+
+    return {
+      point_id: point.id,
+      address: point.address,
+      city: point.city,
+      postal_code: point.postal_code,
+      opening_hours: point.opening_hours,
+      description: point.name,
+    };
+  };
+
   useEffect(() => {
     const initializeCheckout = async () => {
       try {
         // Załaduj metody płatności z Planet Pay
         await paymentManager.loadPlanetPayMethods();
       } catch (error) {
-        console.error('Error initializing checkout:', error);
+        console.error("Error initializing checkout:", error);
       }
     };
 
     initializeCheckout();
     setIsLoading(false);
 
-    // Only redirect if cart is empty and we're not showing success
     if (cart.items.length === 0 && !orderSuccess) {
       const timer = setTimeout(() => {
         router.push("/products");
@@ -121,6 +186,116 @@ export default function CheckoutPage() {
       return () => clearTimeout(timer);
     }
   }, [cart.items.length, orderSuccess, router]);
+
+  useEffect(() => {
+    const normalizedPostalCode = formData.billing.postcode.replace(/\D/g, "");
+    if (normalizedPostalCode.length === 5) {
+      fetchDeliveryPoints(normalizedPostalCode);
+    }
+  }, [formData.billing.postcode]);
+
+  useEffect(() => {
+    fetchPaymentMethods();
+  }, []);
+
+  useEffect(() => {
+    // Setup message listener for iframe communication
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data.type === "SELECT_CHANGE") {
+        const pointData = event.data.value.pointData;
+
+        const parsedPoint =
+          typeof pointData === "string" ? parsePointData(pointData) : pointData;
+
+        const point: DeliveryPoint = {
+          point_id: parsedPoint.point_id,
+          courier_code: parsedPoint.point_id,
+          address: parsedPoint.address,
+          city: parsedPoint.city,
+          postal_code: parsedPoint.postal_code,
+          opening_hours: parsedPoint.opening_hours,
+          description: parsedPoint.description,
+        };
+
+        setSelectedPoint(point);
+        handleInputChange("delivery_point", point.point_id);
+        handleInputChange("shipping_method", point.courier_code);
+        handleInputChange("blpaczka_courier", point.courier_code);
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+
+    return () => {
+      window.removeEventListener("message", handleMessage);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCourier]);
+
+  const fetchDeliveryPoints = async (postalCode: string) => {
+    setIsLoadingPoints(true);
+    setOrderError(null);
+
+    try {
+      const response = await fetch("/api/blpaczka/pudo-points", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ postalCode }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to fetch delivery points");
+      }
+
+      const data = await response.json();
+      if (data.success && data.points) {
+        setDeliveryPoints(data.points);
+      } else {
+        setOrderError(data.error || "Brak dostępnych punktów dostawy");
+      }
+    } catch (error: any) {
+      console.error("Error fetching delivery points:", error);
+      setOrderError(error.message || "Błąd podczas pobierania punktów dostawy");
+    } finally {
+      setIsLoadingPoints(false);
+    }
+  };
+
+  const fetchPaymentMethods = async () => {
+    setIsLoadingPaymentMethods(true);
+    setOrderError(null);
+
+    try {
+      const response = await fetch("/api/planetpay/methods");
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to fetch payment methods");
+      }
+
+      const data = await response.json();
+      console.log("Payment Methods Data: ", data);
+      if (data) {
+        setPaymentMethods(data?.methods || []);
+        if (data?.methods.length > 0) {
+          setFormData((prev) => ({
+            ...prev,
+            payment_method: `planetpay_${data.methods[0].method.toLowerCase()}`,
+          }));
+        }
+      } else {
+        setOrderError("Brak dostępnych metod płatności");
+      }
+    } catch (error: any) {
+      console.error("Error fetching payment methods:", error);
+      setOrderError(error.message || "Błąd podczas pobierania metod płatności");
+    } finally {
+      setIsLoadingPaymentMethods(false);
+    }
+  };
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("pl-PL", {
@@ -168,23 +343,29 @@ export default function CheckoutPage() {
   };
 
   const handleInputChange = (
-    section: "billing" | "shipping",
-    field: string,
+    field: keyof typeof formData | string,
     value: string
   ) => {
-    setFormData((prev) => ({
-      ...prev,
-      [section]: {
-        ...prev[section],
-        [field]: value,
-      },
-    }));
+    if (field.includes(".")) {
+      const [section, subField] = field.split(".");
+      setFormData((prev) => ({
+        ...prev,
+        [section]: {
+          ...prev[section as "billing" | "shipping"],
+          [subField]: value,
+        },
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        [field as keyof typeof formData]: value,
+      }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Basic validation
     const { billing } = formData;
     if (
       !billing.first_name ||
@@ -205,7 +386,9 @@ export default function CheckoutPage() {
     }
 
     // Sprawdź czy metoda dostawy wymaga punktu odbioru
-    const shippingMethod = shippingManager.getShippingMethods().find(m => m.id === formData.shipping_method);
+    const shippingMethod = shippingManager
+      .getShippingMethods()
+      .find((m) => m.id === formData.shipping_method);
     if (shippingMethod?.requires_point && !selectedLocker) {
       setOrderError("Proszę wybrać punkt odbioru dla wybranej metody dostawy");
       return;
@@ -246,16 +429,14 @@ export default function CheckoutPage() {
             key: "_order_total",
             value: calculateTotal().toString(),
           },
-          // Dodaj informacje o wybranym punkcie odbioru
-          ...(selectedLocker ? [{
-            key: "_selected_pickup_point",
-            value: JSON.stringify(selectedLocker),
-          }] : []),
-          // Dodaj informacje o metodzie BLPaczka
-          ...(shippingMethod?.blpaczka_service ? [{
-            key: "_blpaczka_service",
-            value: shippingMethod.blpaczka_service,
-          }] : []),
+          {
+            key: "_delivery_point_id",
+            value: formData.delivery_point || "",
+          },
+          {
+            key: "_blpaczka_courier",
+            value: formData.blpaczka_courier || "",
+          },
         ],
       };
 
@@ -267,13 +448,16 @@ export default function CheckoutPage() {
           try {
             await shippingManager.createShipment(order, selectedLocker);
           } catch (error) {
-            console.error('Error creating shipment:', error);
+            console.error("Error creating shipment:", error);
             // Nie przerywaj procesu zamówienia z powodu błędu przesyłki
           }
         }
 
         // Przetwórz płatność przez Planet Pay
-        if (formData.payment_method !== 'cod' && formData.payment_method !== 'transfer') {
+        if (
+          formData.payment_method !== "cod" &&
+          formData.payment_method !== "transfer"
+        ) {
           try {
             const paymentResult = await paymentManager.processPayment(
               formData.payment_method,
@@ -287,13 +471,23 @@ export default function CheckoutPage() {
               return;
             }
           } catch (error) {
-            console.error('Payment processing error:', error);
-            setOrderError('Błąd podczas przetwarzania płatności. Zamówienie zostało złożone, ale płatność wymaga ręcznego przetworzenia.');
+            console.error("Payment processing error:", error);
+            setOrderError(
+              "Błąd podczas przetwarzania płatności. Zamówienie zostało złożone, ale płatność wymaga ręcznego przetworzenia."
+            );
           }
         }
         clearCart();
         setOrderSuccess(true);
 
+        if (
+          formData.payment_method.startsWith("planetpay_") &&
+          order.payment_url
+        ) {
+          setTimeout(() => {
+            window.location.href = order.payment_url;
+          }, 2000);
+        }
       }
     } catch (error) {
       console.error("Order creation error:", error);
@@ -306,40 +500,44 @@ export default function CheckoutPage() {
   };
 
   const getPaymentMethodTitle = (method: string) => {
-    const paymentMethod = paymentManager.getPaymentMethods().find(m => m.id === method);
-    if (paymentMethod) {
-      return paymentMethod.name;
+    if (method.startsWith("planetpay_")) {
+      const methodType = method.split("_")[1];
+      switch (methodType) {
+        case "card":
+          return "Karta płatnicza (PlanetPay)";
+        case "blik":
+          return "BLIK (PlanetPay)";
+        case "pbl":
+          return "Przelew bankowy (PlanetPay)";
+        default:
+          return "PlanetPay";
+      }
     }
-
-    switch (method) {
-      case "cod":
-        return "Płatność przy odbiorze";
-      case "bacs":
-        return "Przelew bankowy";
-      case "stripe":
-        return "Karta płatnicza";
-      default:
-        return "Płatność przy odbiorze";
-    }
+    return "PlanetPay";
   };
 
   const getShippingMethodTitle = (method: string) => {
-    const shippingMethod = shippingManager.getShippingMethods().find(m => m.id === method);
+    const shippingMethod = shippingManager
+      .getShippingMethods()
+      .find((m) => m.id === method);
     if (shippingMethod) {
       return shippingMethod.name;
     }
 
     switch (method) {
-      case "standard":
-        return "Dostawa standardowa";
-      case "express":
-        return "Dostawa ekspresowa";
+      case "paczkomaty":
+        return "Paczkomat InPost";
+      case "orlen":
+        return "Orlen Paczka";
+      case "dhl":
+        return "DHL";
+      case "dpd":
+        return "DPD";
       default:
-        return "Dostawa standardowa";
+        return "BLPaczka";
     }
   };
 
-  // Show loading state
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -353,7 +551,6 @@ export default function CheckoutPage() {
     );
   }
 
-  // Show success state
   if (orderSuccess) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -388,7 +585,6 @@ export default function CheckoutPage() {
     );
   }
 
-  // Show empty cart message
   if (cart.items.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -430,9 +626,7 @@ export default function CheckoutPage() {
 
         <form onSubmit={handleSubmit}>
           <div className="grid lg:grid-cols-3 gap-8">
-            {/* Billing & Shipping Forms */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Billing Address */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -449,26 +643,20 @@ export default function CheckoutPage() {
                         value={formData.billing.first_name}
                         onChange={(e) =>
                           handleInputChange(
-                            "billing",
-                            "first_name",
+                            "billing.first_name",
                             e.target.value
                           )
                         }
                         required
                       />
                     </div>
-
                     <div>
                       <Label htmlFor="last_name">Nazwisko *</Label>
                       <Input
                         id="last_name"
                         value={formData.billing.last_name}
                         onChange={(e) =>
-                          handleInputChange(
-                            "billing",
-                            "last_name",
-                            e.target.value
-                          )
+                          handleInputChange("billing.last_name", e.target.value)
                         }
                         required
                       />
@@ -479,9 +667,9 @@ export default function CheckoutPage() {
                     <Label htmlFor="company">Firma (opcjonalnie)</Label>
                     <Input
                       id="company"
-                      value={formData.billing.company}
+                      value={formData.billing.company || ""}
                       onChange={(e) =>
-                        handleInputChange("billing", "company", e.target.value)
+                        handleInputChange("billing.company", e.target.value)
                       }
                     />
                   </div>
@@ -494,19 +682,18 @@ export default function CheckoutPage() {
                         type="email"
                         value={formData.billing.email}
                         onChange={(e) =>
-                          handleInputChange("billing", "email", e.target.value)
+                          handleInputChange("billing.email", e.target.value)
                         }
                         required
                       />
                     </div>
-
                     <div>
                       <Label htmlFor="phone">Telefon *</Label>
                       <Input
                         id="phone"
                         value={formData.billing.phone}
                         onChange={(e) =>
-                          handleInputChange("billing", "phone", e.target.value)
+                          handleInputChange("billing.phone", e.target.value)
                         }
                         required
                       />
@@ -519,11 +706,7 @@ export default function CheckoutPage() {
                       id="address_1"
                       value={formData.billing.address_1}
                       onChange={(e) =>
-                        handleInputChange(
-                          "billing",
-                          "address_1",
-                          e.target.value
-                        )
+                        handleInputChange("billing.address_1", e.target.value)
                       }
                       required
                     />
@@ -533,13 +716,9 @@ export default function CheckoutPage() {
                     <Label htmlFor="address_2">Adres 2 (opcjonalnie)</Label>
                     <Input
                       id="address_2"
-                      value={formData.billing.address_2}
+                      value={formData.billing.address_2 || ""}
                       onChange={(e) =>
-                        handleInputChange(
-                          "billing",
-                          "address_2",
-                          e.target.value
-                        )
+                        handleInputChange("billing.address_2", e.target.value)
                       }
                     />
                   </div>
@@ -551,34 +730,35 @@ export default function CheckoutPage() {
                         id="city"
                         value={formData.billing.city}
                         onChange={(e) =>
-                          handleInputChange("billing", "city", e.target.value)
+                          handleInputChange("billing.city", e.target.value)
                         }
                         required
                       />
                     </div>
-
                     <div>
                       <Label htmlFor="postcode">Kod pocztowy *</Label>
                       <Input
                         id="postcode"
                         value={formData.billing.postcode}
-                        onChange={(e) =>
-                          handleInputChange(
-                            "billing",
-                            "postcode",
-                            e.target.value
-                          )
-                        }
+                        onChange={(e) => {
+                          let value = e.target.value;
+                          value = value.replace(/[^\d-]/g, "");
+                          if (value.length > 2 && !value.includes("-")) {
+                            value = `${value.slice(0, 2)}-${value.slice(2, 5)}`;
+                          }
+                          handleInputChange("billing.postcode", value);
+                        }}
                         required
+                        maxLength={6}
+                        placeholder="00-000"
                       />
                     </div>
-
                     <div>
                       <Label htmlFor="country">Kraj *</Label>
                       <Select
                         value={formData.billing.country}
                         onValueChange={(value) =>
-                          handleInputChange("billing", "country", value)
+                          handleInputChange("billing.country", value)
                         }
                       >
                         <SelectTrigger>
@@ -596,7 +776,6 @@ export default function CheckoutPage() {
                 </CardContent>
               </Card>
 
-              {/* Shipping Address */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -617,65 +796,203 @@ export default function CheckoutPage() {
                       Dostawa na adres rozliczeniowy
                     </Label>
                   </div>
-
                   {!shippingToBilling && (
                     <div className="space-y-4">
                       <p className="text-sm text-muted-foreground">
-                        Formularz adresu dostawy będzie tutaj (podobny do
-                        rozliczeniowego)
+                        Formularz adresu dostawy będzie tutaj
                       </p>
                     </div>
                   )}
                 </CardContent>
               </Card>
 
-              {/* Shipping Methods */}
-              <ShippingMethods
-                selectedMethod={formData.shipping_method}
-                onMethodChange={(method) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    shipping_method: method,
-                  }))
-                }
-                cartValue={cart.total}
-                selectedLocker={selectedLocker}
-                onLockerChange={setSelectedLocker}
-              />
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Package className="h-5 w-5" />
+                    Metoda dostawy (BLPaczka)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {formData.billing.postcode.replace(/\D/g, "").length === 5 ? (
+                    isLoadingPoints ? (
+                      <div className="flex justify-center py-4">
+                        <Loader2 className="h-6 w-6 animate-spin" />
+                        <span className="ml-2">Wyszukiwanie punktów...</span>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div>
+                          <Label>Kurier</Label>
+                          <Select
+                            value={selectedCourier}
+                            onValueChange={(value) => {
+                              setSelectedCourier(value);
+                              handleInputChange("blpaczka_courier", value);
+                              handleInputChange("shipping_method", value);
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Wybierz kuriera" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="dhl">DHL</SelectItem>
+                              <SelectItem value="inpost">
+                                Paczkomat InPost
+                              </SelectItem>
+                              <SelectItem value="orlen">
+                                Orlen Paczka
+                              </SelectItem>
+                              <SelectItem value="dpd">DPD</SelectItem>
+                              <SelectItem value="inpost_international">
+                                InPost International
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
 
-              {/* Payment Methods */}
-              <PaymentMethods
-                selectedMethod={formData.payment_method}
-                onMethodChange={(method) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    payment_method: method,
-                  }))
-                }
-                amount={calculateTotal()}
-              />
+                        <div className="mt-4">
+                          <Label>Wybierz punkt dostawy na mapie</Label>
+                          <div className="rounded-lg overflow-hidden border">
+                            <iframe
+                              id="pudoMap"
+                              src={`https://api.blpaczka.com/pudo-map?api_type=${selectedCourier}&postalCode=${formData.billing.postcode.replace(
+                                /\D/g,
+                                ""
+                              )}`}
+                              width="100%"
+                              height="500"
+                              frameBorder="0"
+                            ></iframe>
+                          </div>
+                        </div>
 
-              {/* Order Notes */}
+                        <div className="mt-4">
+                          <Label>Wybrany punkt odbioru</Label>
+                          {selectedPoint ? (
+                            <div className="border rounded-lg p-4 bg-gray-50">
+                              <div className="flex items-start">
+                                <MapPin className="h-5 w-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
+                                <div>
+                                  <h4 className="font-medium">
+                                    {selectedPoint.description}
+                                  </h4>
+                                  <p className="text-sm text-muted-foreground">
+                                    {selectedPoint.address},{" "}
+                                    {selectedPoint.city}
+                                  </p>
+                                  <p className="text-xs mt-1">
+                                    <span className="font-medium">
+                                      Godziny otwarcia:
+                                    </span>{" "}
+                                    {selectedPoint.opening_hours}
+                                  </p>
+                                  <p className="text-xs mt-1">
+                                    <span className="font-medium">Kurier:</span>{" "}
+                                    {getShippingMethodTitle(
+                                      selectedPoint.courier_code
+                                    )}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-muted-foreground text-sm">
+                              Wybierz punkt na mapie powyżej
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  ) : (
+                    <p className="text-muted-foreground">
+                      Wprowadź kod pocztowy w formacie 00-000
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CreditCard className="h-5 w-5" />
+                    Metoda płatności (PlanetPay)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingPaymentMethods ? (
+                    <div className="flex justify-center py-4">
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                      <span className="ml-2">Ładowanie metod płatności...</span>
+                    </div>
+                  ) : paymentMethods ? (
+                    <RadioGroup
+                      value={formData.payment_method}
+                      onValueChange={(value) =>
+                        handleInputChange("payment_method", value)
+                      }
+                    >
+                      <div className="space-y-3">
+                        {paymentMethods.map((method) => (
+                          <div
+                            key={`planetpay_${method.method}`}
+                            className="flex items-center space-x-2 p-3 border rounded-lg"
+                          >
+                            <RadioGroupItem
+                              value={`planetpay_${method.method.toLowerCase()}`}
+                              id={`planetpay_${method.method}`}
+                            />
+                            <Label
+                              htmlFor={`planetpay_${method.method}`}
+                              className="flex-1"
+                            >
+                              <div className="font-medium">
+                                {method.method === "CARD"
+                                  ? "Karta płatnicza"
+                                  : method.method === "BLIK"
+                                  ? "BLIK"
+                                  : method.method === "PBL"
+                                  ? "Przelew bankowy"
+                                  : method.method}
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {method.method === "CARD"
+                                  ? "Visa, Mastercard"
+                                  : method.method === "BLIK"
+                                  ? "Szybka płatność mobilna"
+                                  : method.method === "PBL"
+                                  ? "Przelew online"
+                                  : ""}
+                              </div>
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    </RadioGroup>
+                  ) : (
+                    <p className="text-muted-foreground">
+                      Brak dostępnych metod płatności
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader>
                   <CardTitle>Uwagi do zamówienia</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <Textarea
-                    placeholder="Dodatkowe informacje o zamówieniu (opcjonalnie)"
-                    value={formData.customer_note}
+                    placeholder="Dodatkowe informacje (opcjonalnie)"
+                    value={formData.customer_note || ""}
                     onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        customer_note: e.target.value,
-                      }))
+                      handleInputChange("customer_note", e.target.value)
                     }
                   />
                 </CardContent>
               </Card>
             </div>
 
-            {/* Order Summary */}
             <div className="space-y-6">
               <Card className="sticky top-24">
                 <CardHeader>
@@ -685,7 +1002,6 @@ export default function CheckoutPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Cart Items */}
                   <div className="space-y-3">
                     {cart.items.map((item) => (
                       <div
@@ -733,7 +1049,6 @@ export default function CheckoutPage() {
 
                   <Separator />
 
-                  {/* Coupon */}
                   <div className="space-y-2">
                     <div className="flex gap-2">
                       <Input
@@ -764,19 +1079,14 @@ export default function CheckoutPage() {
 
                   <Separator />
 
-                  {/* Totals */}
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span>Produkty</span>
                       <span>{formatPrice(cart.total)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Dostawa</span>
-                      <span>
-                        {calculateShipping() === 0
-                          ? "Darmowa"
-                          : formatPrice(calculateShipping())}
-                      </span>
+                      <span>Dostawa (BLPaczka)</span>
+                      <span>{formatPrice(calculateShipping())}</span>
                     </div>
                     {couponDiscount > 0 && (
                       <div className="flex justify-between text-green-600">
@@ -795,7 +1105,7 @@ export default function CheckoutPage() {
                     type="submit"
                     className="w-full"
                     size="lg"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || !formData.delivery_point}
                   >
                     {isSubmitting ? (
                       <>

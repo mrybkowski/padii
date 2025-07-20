@@ -28,6 +28,40 @@ export interface Product {
   }>;
 }
 
+export interface Order {
+  id?: number;
+  status: string;
+  billing: {
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone: string;
+    address_1: string;
+    city: string;
+    postcode: string;
+    country: string;
+  };
+  shipping: {
+    first_name: string;
+    last_name: string;
+    address_1: string;
+    city: string;
+    postcode: string;
+    country: string;
+  };
+  line_items: Array<{
+    product_id: number;
+    quantity: number;
+    price: string;
+  }>;
+  shipping_method: string;
+  payment_method: string;
+  meta_data: Array<{
+    key: string;
+    value: string;
+  }>;
+}
+
 export interface Category {
   id: number;
   name: string;
@@ -51,7 +85,7 @@ export interface BLPaczkaPoint {
     lat: number;
     lng: number;
   };
-  type: 'inpost' | 'orlen' | 'dpd' | 'ups' | 'fedex' | 'poczta';
+  type: "inpost" | "orlen" | "dpd" | "ups" | "fedex" | "poczta";
   available_24h: boolean;
   services: string[];
 }
@@ -177,19 +211,21 @@ class WordPressAPI {
   }
 
   // BLPaczka integration
-  async getBLPaczkaPoints(params: {
-    city?: string;
-    postal_code?: string;
-    type?: string;
-    limit?: number;
-  } = {}): Promise<BLPaczkaPoint[]> {
+  async getBLPaczkaPoints(
+    params: {
+      city?: string;
+      postal_code?: string;
+      type?: string;
+      limit?: number;
+    } = {}
+  ): Promise<BLPaczkaPoint[]> {
     const searchParams = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined) {
         searchParams.append(key, value.toString());
       }
     });
-    
+
     const query = searchParams.toString();
     return this.request(`/blpaczka/points${query ? `?${query}` : ""}`);
   }
@@ -199,7 +235,9 @@ class WordPressAPI {
   }
 
   async getShippingMethods(zoneId?: number): Promise<any[]> {
-    const endpoint = zoneId ? `/shipping/zones/${zoneId}/methods` : "/shipping/zones";
+    const endpoint = zoneId
+      ? `/shipping/zones/${zoneId}/methods`
+      : "/shipping/zones";
     return this.request(endpoint);
   }
 
@@ -273,6 +311,13 @@ class WordPressAPI {
 
   async trackBLPaczkaShipment(trackingNumber: string) {
     return this.request(`/blpaczka/track/${trackingNumber}`);
+  }
+
+  async updateOrder(id: number, order: Partial<Order>): Promise<Order> {
+    return this.request(`/orders/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(order),
+    });
   }
 }
 
