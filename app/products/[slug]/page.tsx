@@ -174,7 +174,7 @@ export default function ProductPage() {
               <div className="flex gap-2 overflow-x-auto">
                 {product.images.map((image, index) => (
                   <button
-                    key={image.id}
+                    key={index}
                     onClick={() => setSelectedImageIndex(index)}
                     className={cn(
                       "relative w-20 h-20 rounded-lg overflow-hidden border-2 transition-all",
@@ -248,7 +248,7 @@ export default function ProductPage() {
               </div>
 
               <p className="text-muted-foreground leading-relaxed">
-                <div
+                <span
                   dangerouslySetInnerHTML={{
                     __html: product.short_description,
                   }}
@@ -386,7 +386,7 @@ export default function ProductPage() {
                 <CardContent className="p-6">
                   <div className="prose max-w-none">
                     <p className="text-muted-foreground leading-relaxed">
-                      <div
+                      <span
                         dangerouslySetInnerHTML={{
                           __html: product.description,
                         }}

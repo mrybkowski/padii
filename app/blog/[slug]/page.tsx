@@ -243,7 +243,7 @@ export default function BlogPostPage() {
 
         {/* Article Content */}
         <div className="prose prose-lg max-w-none mb-12">
-          <div dangerouslySetInnerHTML={{ __html: post.content }} />
+          <span dangerouslySetInnerHTML={{ __html: post.content }} />
         </div>
 
         {/* Tags */}
@@ -301,7 +301,9 @@ export default function BlogPostPage() {
                           relatedPost.featuredImage?.src ||
                           "https://images.unsplash.com/photo-1601758228041-f3b2795255f1?w=400&h=250&fit=crop"
                         }
-                        alt={relatedPost.featuredImage?.alt || relatedPost.title}
+                        alt={
+                          relatedPost.featuredImage?.alt || relatedPost.title
+                        }
                         fill
                         className="object-cover transition-transform duration-500 group-hover:scale-105"
                         sizes="(max-width: 768px) 100vw, 300px"
@@ -313,7 +315,11 @@ export default function BlogPostPage() {
                     <div className="space-y-2">
                       <div className="flex gap-1">
                         {relatedPost.categories.slice(0, 1).map((category) => (
-                          <Badge key={category} variant="outline" className="text-xs">
+                          <Badge
+                            key={category}
+                            variant="outline"
+                            className="text-xs"
+                          >
                             {category}
                           </Badge>
                         ))}
