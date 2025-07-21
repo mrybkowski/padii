@@ -7,6 +7,9 @@ const PLANET_PAY_MERCHANT_ID =
 
 export async function POST(req: NextRequest) {
   try {
+    const paymentRequest = await req.json();
+
+    // Najpierw uzyskaj token dostępu
     const authResponse = await fetch(
       `${PLANET_PAY_API_URL}/v1/ecommerce/auth`,
       {
@@ -16,10 +19,10 @@ export async function POST(req: NextRequest) {
         },
         body: JSON.stringify({
           resource: "PAYMENT",
-          channel: "WEBAPI",
+          channel: paymentRequest.channel || "PAYWALL",
           secret: PLANET_PAY_SECRET,
           merchant: { merchantId: PLANET_PAY_MERCHANT_ID },
-          customer: { email: "marcin@rybkowski.pl" },
+          customer: { email: paymentRequest.customer?.email },
         }),
       }
     );
@@ -35,9 +38,7 @@ export async function POST(req: NextRequest) {
     const authData = await authResponse.json();
     const accessToken = authData.access_token;
 
-    const paymentRequest = await req.json();
-    console.log("paymentRequest: ", paymentRequest);
-
+    // Utwórz płatność
     const response = await fetch(`${PLANET_PAY_API_URL}/v1/ecommerce/payment`, {
       method: "POST",
       headers: {
@@ -45,13 +46,7 @@ export async function POST(req: NextRequest) {
         accept: "application/json",
         Authorization: `Bearer ${accessToken}`,
       },
-      body: JSON.stringify({
-        ...paymentRequest,
-        auth: {
-          secret: PLANET_PAY_SECRET,
-          merchant: { merchantId: PLANET_PAY_MERCHANT_ID },
-        },
-      }),
+      body: JSON.stringify(paymentRequest),
     });
 
     if (!response.ok) {

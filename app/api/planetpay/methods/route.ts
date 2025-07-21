@@ -17,10 +17,9 @@ export async function GET(req: NextRequest) {
         },
         body: JSON.stringify({
           resource: "PAYMENT",
-          channel: "WEBAPI",
+          channel: "PAYWALL",
           secret: PLANET_PAY_SECRET,
           merchant: { merchantId: PLANET_PAY_MERCHANT_ID },
-          customer: { email: "marcin@rybkowski.pl" },
         }),
       }
     );

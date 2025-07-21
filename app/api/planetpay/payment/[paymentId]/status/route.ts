@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 
     // Get auth token
     const authResponse = await fetch(
-      `${PLANET_PAY_API_URL}/v1/ecommerce/auth`,
+      `${process.env.NEXT_PUBLIC_PLANET_PAY_API_URL}/v1/ecommerce/auth`,
       {
         method: "POST",
         headers: {
@@ -24,9 +24,9 @@ export async function GET(req: NextRequest) {
         },
         body: JSON.stringify({
           resource: "PAYMENT",
-          channel: "WEBAPI",
-          secret: PLANET_PAY_SECRET,
-          merchant: { merchantId: PLANET_PAY_MERCHANT_ID },
+          channel: "PAYWALL",
+          secret: process.env.PLANET_PAY_SECRET,
+          merchant: { merchantId: process.env.NEXT_PUBLIC_PLANET_PAY_MERCHANT_ID },
         }),
       }
     );
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
 
     // Fetch payment status
     const response = await fetch(
-      `${PLANET_PAY_API_URL}/v1/ecommerce/payment/${paymentId}/status`,
+      `${process.env.NEXT_PUBLIC_PLANET_PAY_API_URL}/v1/ecommerce/payment/${paymentId}/status`,
       {
         method: "GET",
         headers: {

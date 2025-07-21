@@ -25,16 +25,14 @@ export async function PUT(
   }
 
   try {
-    const paymentRequest = await req.json();
-
     // 1. Pobierz token JWT
     const authResponse = await axios.post(
-      AUTH_URL,
+      `${process.env.NEXT_PUBLIC_PLANET_PAY_API_URL}/v1/ecommerce/auth`,
       {
         resource: "PAYMENT",
-        channel: CHANNEL,
-        secret: MERCHANT_SECRET,
-        merchant: { merchantId: MERCHANT_ID },
+        channel: "PAYWALL",
+        secret: process.env.PLANET_PAY_SECRET,
+        merchant: { merchantId: process.env.NEXT_PUBLIC_PLANET_PAY_MERCHANT_ID },
       },
       { headers: { "Content-Type": "application/json" } }
     );
@@ -48,10 +46,10 @@ export async function PUT(
     }
 
     const response = await axios.put(
-      `https://api.sandbox.planetpay.pl/v1/ecommerce/payment/${paymentId}/instrument`,
+      `${process.env.NEXT_PUBLIC_PLANET_PAY_API_URL}/v1/ecommerce/payment/${paymentId}/instrument`,
       {
         instrument: {
-          method: "BLIK_CODE",
+          type: "BLIK_CODE",
           code: instrument.code,
         },
       },

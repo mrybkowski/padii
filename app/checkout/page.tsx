@@ -384,7 +384,7 @@ export default function CheckoutPage() {
         // Utwórz przesyłkę w BLPaczka jeśli potrzeba
         if (shippingMethod?.blpaczka_service) {
           try {
-            await shippingManager.createShipment(order, selectedLocker);
+            await createBLPaczkaShipment(order, selectedPoint);
           } catch (error) {
             console.error("Error creating shipment:", error);
             // Nie przerywaj procesu zamówienia z powodu błędu przesyłki
@@ -418,6 +418,10 @@ export default function CheckoutPage() {
             );
           }
         }
+
+        // Jeśli dotarliśmy tutaj, oznacza to sukces (np. płatność przy odbiorze)
+        clearCart();
+        setOrderSuccess(true);
       }
     } catch (error) {
       console.error("Order creation error:", error);
@@ -429,27 +433,94 @@ export default function CheckoutPage() {
     }
   };
 
+  const createBLPaczkaShipment = async (order: any, deliveryPoint: DeliveryPoint | null) => {
+    try {
+      const shipmentData = {
+        courierSearch: {
+          courier_code: formData.blpaczka_courier,
+          type: "package",
+          weight: 0.5, // Domyślna waga dla podkładów
+          side_x: 30,
+          side_y: 20,
+          side_z: 5,
+          postal_sender: formData.billing.postcode.replace(/\D/g, ""),
+          postal_delivery: formData.billing.postcode.replace(/\D/g, ""),
+          foreign: "local",
+        },
+        cartOrder: {
+          payment: "bank", // Domyślnie bank, można dostosować
+        },
+        cart: [
+          {
+            Order: {
+              name: `${formData.billing.first_name} ${formData.billing.last_name}`,
+              email: formData.billing.email,
+              phone: formData.billing.phone,
+              street: formData.billing.address_1,
+              house_no: formData.billing.address_2 || "",
+              postal: formData.billing.postcode,
+              city: formData.billing.city,
+              account: "", // Można dodać numer konta jeśli potrzebny
+              taker_name: `${formData.billing.first_name} ${formData.billing.last_name}`,
+              taker_email: formData.billing.email,
+              taker_phone: formData.billing.phone,
+              taker_street: formData.billing.address_1,
+              taker_house_no: formData.billing.address_2 || "",
+              taker_postal: formData.billing.postcode,
+              taker_city: formData.billing.city,
+              taker_point: deliveryPoint?.point_id || "",
+              package_content: "Podkłady higieniczne dla psów",
+              ref_number: order.id.toString(),
+            },
+          },
+        ],
+      };
+
+      const response = await fetch("/api/blpaczka/create-order", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(shipmentData),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to create BLPaczka shipment");
+      }
+
+      const result = await response.json();
+      console.log("BLPaczka shipment created:", result);
+      return result;
+    } catch (error) {
+      console.error("Error creating BLPaczka shipment:", error);
+      throw error;
+    }
+  };
+
   const processPlanetPayPayment = async (order: any) => {
     try {
       const paymentMethod = formData.payment_method
         .replace("planetpay_", "")
         .toUpperCase();
 
-      const isBlik = paymentMethod === "BLIK";
-
       const paymentRequest = {
         device: {
           browserData: {
             javascriptEnabled: true,
             language: navigator.language || "pl-PL",
+            colorDepth: "24",
+            screenHeight: window.screen.height,
+            screenWidth: window.screen.width,
+            timezone: new Date().getTimezoneOffset(),
           },
         },
-        channel: "WEBAPI" as const,
+        channel: "PAYWALL" as const,
         method: paymentMethod as any,
         merchant: {
           merchantId: process.env.NEXT_PUBLIC_PLANET_PAY_MERCHANT_ID!,
-          merchantName: "Padii.pl",
           name: "Padii",
+          url: window.location.origin,
+          redirectURL: `${window.location.origin}/order-received/${order.id}`,
           location: {
             street: "ul. Prosta 21",
             postal: "05-825",
@@ -460,6 +531,8 @@ export default function CheckoutPage() {
         customer: {
           email: formData.billing.email,
           name: `${formData.billing.first_name} ${formData.billing.last_name}`,
+          firstName: formData.billing.first_name,
+          lastName: formData.billing.last_name,
           billing: {
             street: formData.billing.address_1,
             postal: formData.billing.postcode,
@@ -475,19 +548,30 @@ export default function CheckoutPage() {
           },
         },
         order: {
-          amount: Math.round(calculateTotal()),
-          commission: 0,
+          amount: Math.round(calculateTotal() * 100), // Planet Pay wymaga kwoty w groszach
           currency: "PLN",
           extOrderId: order.id.toString(),
           description: `Zamówienie #${order.id} - Padii.pl`,
           shipping: {
-            city: formData.billing.city,
             street: formData.billing.address_1,
+            city: formData.billing.city,
             postal: formData.billing.postcode,
             country: "POL",
           },
         },
+        options: {
+          validTime: 1800, // 30 minut na płatność
+          language: "pl",
+        },
       };
+
+      // Dodaj instrument dla BLIK jeśli potrzebny
+      if (paymentMethod === "BLIK" && formData.instrument?.code) {
+        paymentRequest.instrument = {
+          type: "BLIK_CODE",
+          code: formData.instrument.code,
+        };
+      }
 
       const createResponse = await fetch("/api/planetpay/payment", {
         method: "POST",
@@ -503,17 +587,12 @@ export default function CheckoutPage() {
       }
 
       const createData = await createResponse.json();
-      const paymentId = createData.paymentId;
-
-      if (!paymentId) {
-        throw new Error("Brak paymentId w odpowiedzi z PlanetPay");
-      }
 
       if (createData.status === "COMPLETED") {
         return { success: true };
       } else if (createData.redirectURL) {
         return { success: true, redirectUrl: createData.redirectURL };
-      } else if (createData.status === "PENDING") {
+      } else if (createData.status === "NEW" || createData.status === "PENDING") {
         return { success: true };
       } else {
         throw new Error("Płatność odrzucona lub nieprawidłowa");
@@ -748,7 +827,6 @@ export default function CheckoutPage() {
                       }
                     />
                   </div>
-                  processPlanetPayPayment
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <Label htmlFor="city">Miasto *</Label>
@@ -874,7 +952,7 @@ export default function CheckoutPage() {
                         <div className="rounded-lg overflow-hidden border">
                           <iframe
                             id="pudoMap"
-                            src={`https://api.blpaczka.com/pudo-map?api_type=${selectedCourier}&postalCode=${formData.billing.postcode.replace(
+                            src={`${process.env.NEXT_PUBLIC_BL_API_URL}/pudo-map?api_type=${selectedCourier}&postalCode=${formData.billing.postcode.replace(
                               /\D/g,
                               ""
                             )}`}
@@ -992,7 +1070,7 @@ export default function CheckoutPage() {
                           .filter((item) => item.props.status !== "ENABLED")}
 
                         {/* BLIK Code Input */}
-                        {/* {formData.payment_method === "planetpay_blik" && (
+                        {formData.payment_method === "planetpay_blik" && (
                           <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
                             <div className="flex items-center gap-2 mb-3">
                               <span className="font-medium text-blue-900">
@@ -1004,6 +1082,7 @@ export default function CheckoutPage() {
                               placeholder="Wprowadź 6-cyfrowy kod BLIK"
                               maxLength={6}
                               className="text-center text-lg tracking-widest font-mono"
+                              value={formData.instrument?.code || ""}
                               onChange={(e) =>
                                 handleInputChange(
                                   "instrument.code",
@@ -1016,7 +1095,7 @@ export default function CheckoutPage() {
                               powyżej
                             </p>
                           </div>
-                        )} */}
+                        )}
                       </div>
                     </RadioGroup>
                   ) : (
@@ -1155,7 +1234,11 @@ export default function CheckoutPage() {
                     type="submit"
                     className="w-full"
                     size="lg"
-                    disabled={isSubmitting || !formData.delivery_point}
+                    disabled={
+                      isSubmitting || 
+                      (formData.shipping_method !== "blpaczka" && !formData.delivery_point) ||
+                      (formData.payment_method === "planetpay_blik" && !formData.instrument?.code)
+                    }
                   >
                     {isSubmitting ? (
                       <>
