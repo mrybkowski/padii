@@ -1,257 +1,176 @@
-import { wordpressAPI, PlanetPayMethod } from './wordpress';
+// lib/payments.ts
 
-export interface PaymentProvider {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  enabled: boolean;
-  config?: Record<string, any>;
-  planet_pay_id?: string;
-}
-
+// Interfejsy typów
 export interface PaymentMethod {
   id: string;
-  provider: string;
   name: string;
   description: string;
-  fee?: number;
-  minAmount?: number;
-  maxAmount?: number;
-  planet_pay_method?: string;
+  icon_url?: string;
+  blik_required?: boolean;
+  pbl_banks?: Bank[];
 }
 
-export interface PaymentResult {
-  success: boolean;
-  transactionId?: string;
-  redirectUrl?: string;
-  error?: string;
-  planet_pay_data?: any;
+export interface Bank {
+  id: string;
+  name: string;
+  logo_url: string;
 }
 
-class PaymentManager {
-  private providers: PaymentProvider[] = [
-    {
-      id: 'stripe',
-      name: 'Stripe',
-      description: 'Karty płatnicze, BLIK, przelewy',
-      icon: '💳',
-      enabled: true,
-      planet_pay_id: 'stripe',
-    },
-    {
-      id: 'przelewy24',
-      name: 'Przelewy24',
-      description: 'Polskie banki i BLIK',
-      icon: '🏦',
-      enabled: true,
-      planet_pay_id: 'przelewy24',
-    },
-    {
-      id: 'payu',
-      name: 'PayU',
-      description: 'Szybkie płatności online',
-      icon: '⚡',
-      enabled: true,
-      planet_pay_id: 'payu',
-    },
-    {
-      id: 'paypal',
-      name: 'PayPal',
-      description: 'Płatności międzynarodowe',
-      icon: '🌍',
-      enabled: true,
-      planet_pay_id: 'paypal',
-    },
-    {
-      id: 'blik',
-      name: 'BLIK',
-      description: 'Płatność kodem z aplikacji bankowej',
-      icon: '📱',
-      enabled: true,
-      planet_pay_id: 'blik',
-    },
-    {
-      id: 'bank_transfer',
-      name: 'Przelew tradycyjny',
-      description: 'Przelew na konto bankowe',
-      icon: '🏛️',
-      enabled: true,
-      planet_pay_id: 'bacs',
-    },
-    {
-      id: 'cod',
-      name: 'Płatność przy odbiorze',
-      description: 'Zapłać kurierowi gotówką',
-      icon: '💰',
-      enabled: true,
-      planet_pay_id: 'cod',
-    },
-  ];
+export interface PaymentResponse {
+  status: "CREATED" | "PENDING" | "COMPLETED" | "FAILED";
+  payment_id: string;
+  redirect_url?: string;
+  error_message?: string;
+}
 
-  async loadPlanetPayMethods(): Promise<void> {
+export interface PaymentRequest {
+  orderId: number;
+  paymentMethod: string;
+  billing: any;
+  shipping: any;
+  total: number; // w groszach
+  currency: string;
+  redirectUrl: string;
+  blikCode?: string;
+  bankId?: string;
+}
+
+// Klasa zarządzająca płatnościami
+export class PaymentManager {
+  private planetPayApiUrl: string;
+  private planetPayApiKey: string;
+
+  constructor() {
+    this.planetPayApiUrl =
+      process.env.NEXT_PUBLIC_PLANET_PAY_API_URL ||
+      "https://sandbox.planetpay.example/api";
+    this.planetPayApiKey = process.env.NEXT_PUBLIC_PLANET_PAY_API_KEY || "";
+  }
+
+  // Pobiera dostępne metody płatności
+  async getPlanetPayMethods(): Promise<PaymentMethod[]> {
     try {
-      const methods = await wordpressAPI.getPlanetPayMethods();
-      
-      // Aktualizuj providers na podstawie danych z Planet Pay
-      this.providers = this.providers.map(provider => {
-        const planetPayMethod = methods.find(m => m.id === provider.planet_pay_id);
-        if (planetPayMethod) {
-          return {
-            ...provider,
-            enabled: planetPayMethod.enabled,
-            name: planetPayMethod.title || provider.name,
-            description: planetPayMethod.description || provider.description,
-            config: planetPayMethod.settings,
-          };
+      const response = await fetch(
+        `${this.planetPayApiUrl}/v1/ecommerce/payment/methods`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${this.planetPayApiKey}`,
+            "Content-Type": "application/json",
+          },
         }
-        return provider;
-      });
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch payment methods");
+      }
+
+      return await response.json();
     } catch (error) {
-      console.error('Error loading Planet Pay methods:', error);
+      console.error("Error loading payment methods:", error);
+      return this.getDefaultMethods();
     }
   }
-  getAvailableProviders(): PaymentProvider[] {
-    return this.providers.filter(provider => provider.enabled);
+
+  // Tworzy płatność w systemie PlanetPay
+  async createPayment(paymentData: PaymentRequest): Promise<PaymentResponse> {
+    try {
+      // Przygotuj dane zgodne z API PlanetPay
+      const payload = {
+        order_id: paymentData.orderId,
+        amount: paymentData.total,
+        currency: paymentData.currency,
+        method: paymentData.paymentMethod.replace("planetpay_", ""),
+        return_url: paymentData.redirectUrl,
+        customer: {
+          email: paymentData.billing.email,
+          first_name: paymentData.billing.first_name,
+          last_name: paymentData.billing.last_name,
+          phone: paymentData.billing.phone,
+        },
+        billing_address: {
+          line1: paymentData.billing.address_1,
+          line2: paymentData.billing.address_2 || "",
+          city: paymentData.billing.city,
+          postal_code: paymentData.billing.postcode,
+          country: paymentData.billing.country,
+        },
+        shipping_address: {
+          line1: paymentData.shipping.address_1,
+          line2: paymentData.shipping.address_2 || "",
+          city: paymentData.shipping.city,
+          postal_code: paymentData.shipping.postcode,
+          country: paymentData.shipping.country,
+        },
+        metadata: {
+          order_id: paymentData.orderId,
+        },
+        blik_code: paymentData.blikCode,
+        bank_id: paymentData.bankId,
+      };
+
+      const response = await fetch(`${this.planetPayApiUrl}/payments`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.planetPayApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error("PlanetPay payment error:", data);
+        return {
+          status: "FAILED",
+          payment_id: "",
+          error_message: data.error || "Payment processing failed",
+        };
+      }
+
+      return {
+        status: data.status,
+        payment_id: data.payment_id,
+        redirect_url: data.redirect_url,
+      };
+    } catch (error) {
+      console.error("PlanetPay payment error:", error);
+      return {
+        status: "FAILED",
+        payment_id: "",
+        error_message: "Internal server error",
+      };
+    }
   }
 
-  getPaymentMethods(): PaymentMethod[] {
+  // Domyślne metody płatności (fallback)
+  private getDefaultMethods(): PaymentMethod[] {
     return [
       {
-        id: 'card',
-        provider: 'stripe',
-        name: 'Karta płatnicza',
-        description: 'Visa, Mastercard, American Express',
-        planet_pay_method: 'stripe',
+        id: "planetpay_card",
+        name: "Karta płatnicza",
+        description: "Visa, Mastercard",
       },
       {
-        id: 'blik',
-        provider: 'blik',
-        name: 'BLIK',
-        description: 'Kod z aplikacji bankowej',
-        planet_pay_method: 'blik',
+        id: "planetpay_blik",
+        name: "BLIK",
+        description: "Szybka płatność mobilna",
+        blik_required: true,
       },
       {
-        id: 'p24',
-        provider: 'przelewy24',
-        name: 'Przelewy24',
-        description: 'Banki polskie',
-        planet_pay_method: 'przelewy24',
-      },
-      {
-        id: 'payu',
-        provider: 'payu',
-        name: 'PayU',
-        description: 'Szybkie płatności',
-        planet_pay_method: 'payu',
-      },
-      {
-        id: 'paypal',
-        provider: 'paypal',
-        name: 'PayPal',
-        description: 'Konto PayPal',
-        planet_pay_method: 'paypal',
-      },
-      {
-        id: 'transfer',
-        provider: 'bank_transfer',
-        name: 'Przelew bankowy',
-        description: 'Tradycyjny przelew',
-        planet_pay_method: 'bacs',
-      },
-      {
-        id: 'cod',
-        provider: 'cod',
-        name: 'Przy odbiorze',
-        description: 'Gotówka kurierowi',
-        planet_pay_method: 'cod',
+        id: "planetpay_pbl",
+        name: "Przelew bankowy",
+        description: "Przelew online",
+        pbl_banks: [
+          { id: "ing", name: "ING Bank Śląski", logo_url: "" },
+          { id: "pko", name: "PKO BP", logo_url: "" },
+          { id: "mbank", name: "mBank", logo_url: "" },
+        ],
       },
     ];
   }
-
-  async processPayment(
-    method: string,
-    amount: number,
-    orderData: any
-  ): Promise<PaymentResult> {
-    try {
-      const paymentMethod = this.getPaymentMethods().find(m => m.id === method);
-      if (!paymentMethod?.planet_pay_method) {
-        throw new Error('Nieobsługiwana metoda płatności');
-      }
-
-      switch (method) {
-        case 'card':
-        case 'blik':
-        case 'p24':
-        case 'payu':
-        case 'paypal':
-          // Płatności Planet Pay są teraz obsługiwane bezpośrednio w checkout
-          return {
-            success: true,
-            transactionId: `txn_${Date.now()}`,
-          };
-        
-        case 'transfer':
-          // Dla przelewu - instrukcje
-          return {
-            success: true,
-            transactionId: `transfer_${Date.now()}`,
-          };
-        
-        case 'cod':
-          // Dla płatności przy odbiorze
-          return {
-            success: true,
-            transactionId: `cod_${Date.now()}`,
-          };
-        
-        default:
-          return {
-            success: false,
-            error: 'Nieobsługiwana metoda płatności',
-          };
-      }
-    } catch (error) {
-      console.error('Payment processing error:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Błąd podczas przetwarzania płatności',
-      };
-    }
-  }
-
-  async checkPaymentStatus(transactionId: string): Promise<any> {
-    try {
-      const response = await fetch(`/api/planetpay/payment/${transactionId}/status`);
-      if (!response.ok) {
-        throw new Error('Failed to check payment status');
-      }
-      return await response.json();
-    } catch (error) {
-      console.error('Error checking payment status:', error);
-      return {
-        status: 'unknown',
-        error: 'Nie można sprawdzić statusu płatności',
-      };
-    }
-  }
-  getPaymentInstructions(method: string, orderData: any): string {
-    switch (method) {
-      case 'transfer':
-        return `
-          Dane do przelewu:
-          Odbiorca: Padii.pl - Jove Sp. z o.o.
-          Numer konta: 12 3456 7890 1234 5678 9012 3456
-          Tytuł: Zamówienie #${orderData.id}
-          Kwota: ${orderData.total} PLN
-        `;
-      case 'cod':
-        return 'Zapłać kurierowi gotówką przy odbiorze przesyłki.';
-      default:
-        return 'Instrukcje płatności zostaną wysłane na email.';
-    }
-  }
 }
 
+// Eksportujemy instancję, aby używać jej w aplikacji
 export const paymentManager = new PaymentManager();

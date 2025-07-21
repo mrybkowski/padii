@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const PLANET_PAY_API_URL = process.env.PLANET_PAY_API_URL || "";
+const PLANET_PAY_API_URL = process.env.NEXT_PUBLIC_PLANET_PAY_API_URL || "";
 const PLANET_PAY_SECRET = process.env.PLANET_PAY_SECRET || "";
-const PLANET_PAY_MERCHANT_ID = process.env.PLANET_PAY_MERCHANT_ID || "";
+const PLANET_PAY_MERCHANT_ID =
+  process.env.NEXT_PUBLIC_PLANET_PAY_MERCHANT_ID || "";
 
 export async function POST(req: NextRequest) {
   try {

@@ -85,11 +85,8 @@ export default function CheckoutPage() {
   const [selectedLocker, setSelectedLocker] = useState<
     ParcelLocker | undefined
   >();
-  const [deliveryPoints, setDeliveryPoints] = useState<DeliveryPoint[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
-  const [isLoadingPoints, setIsLoadingPoints] = useState(false);
   const [isLoadingPaymentMethods, setIsLoadingPaymentMethods] = useState(false);
-  const [planetPayToken, setPlanetPayToken] = useState<string | null>(null);
   const [selectedCourier, setSelectedCourier] = useState<string>("dhl");
   const [selectedPoint, setSelectedPoint] = useState<DeliveryPoint | null>(
     null
@@ -105,7 +102,7 @@ export default function CheckoutPage() {
       address_2: "",
       city: "",
       postcode: "",
-      country: "PL",
+      country: "POL",
       company: "",
     },
     shipping: {},
@@ -114,6 +111,10 @@ export default function CheckoutPage() {
     customer_note: "",
     delivery_point: "",
     blpaczka_courier: "dhl",
+    instrument: {
+      type: "",
+      code: "",
+    },
   });
 
   const parsePointData = (
@@ -169,38 +170,6 @@ export default function CheckoutPage() {
   };
 
   useEffect(() => {
-    const initializeCheckout = async () => {
-      try {
-        // Załaduj metody płatności z Planet Pay
-        await paymentManager.loadPlanetPayMethods();
-      } catch (error) {
-        console.error("Error initializing checkout:", error);
-      }
-    };
-
-    initializeCheckout();
-    setIsLoading(false);
-
-    if (cart.items.length === 0 && !orderSuccess) {
-      const timer = setTimeout(() => {
-        router.push("/products");
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [cart.items.length, orderSuccess, router]);
-
-  useEffect(() => {
-    const normalizedPostalCode = formData.billing.postcode.replace(/\D/g, "");
-    if (normalizedPostalCode.length === 5) {
-      fetchDeliveryPoints(normalizedPostalCode);
-    }
-  }, [formData.billing.postcode]);
-
-  useEffect(() => {
-    fetchPaymentMethods();
-  }, []);
-
-  useEffect(() => {
     // Setup message listener for iframe communication
     const handleMessage = (event: MessageEvent) => {
       if (event.data.type === "SELECT_CHANGE") {
@@ -234,70 +203,19 @@ export default function CheckoutPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCourier]);
 
-  const fetchDeliveryPoints = async (postalCode: string) => {
-    setIsLoadingPoints(true);
-    setOrderError(null);
-
-    try {
-      const response = await fetch("/api/blpaczka/pudo-points", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ postalCode }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to fetch delivery points");
-      }
-
-      const data = await response.json();
-      if (data.success && data.points) {
-        setDeliveryPoints(data.points);
-      } else {
-        setOrderError(data.error || "Brak dostępnych punktów dostawy");
-      }
-    } catch (error: any) {
-      console.error("Error fetching delivery points:", error);
-      setOrderError(error.message || "Błąd podczas pobierania punktów dostawy");
-    } finally {
-      setIsLoadingPoints(false);
-    }
-  };
-
   const fetchPaymentMethods = async () => {
     setIsLoadingPaymentMethods(true);
     setOrderError(null);
 
     try {
-      // Pobierz token autoryzacyjny
-      const authResponse = await fetch("/api/planetpay/auth", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          customerEmail: formData.billing.email || "guest@padii.pl",
-        }),
-      });
-
-      if (!authResponse.ok) {
-        throw new Error("Failed to authenticate with Planet Pay");
-      }
-
-      const authData = await authResponse.json();
-      setPlanetPayToken(authData.access_token);
-
-      // Pobierz dostępne metody płatności
       const methodsResponse = await fetch("/api/planetpay/methods");
-      
+
       if (!methodsResponse.ok) {
         throw new Error("Failed to fetch payment methods");
       }
 
       const methodsData = await methodsResponse.json();
-      
+
       if (methodsData?.methods) {
         setPaymentMethods(methodsData.methods);
         if (methodsData.methods.length > 0) {
@@ -475,11 +393,13 @@ export default function CheckoutPage() {
 
         // Przetwórz płatność przez Planet Pay
         if (
-          formData.payment_method !== "cod" &&
-          formData.payment_method !== "transfer"
+          formData.payment_method !== "planetpay_cod" &&
+          formData.payment_method !== "planetpay_transfer"
         ) {
           try {
             const paymentResult = await processPlanetPayPayment(order);
+
+            console.log("Payment result:", paymentResult);
 
             if (paymentResult.success && paymentResult.redirectUrl) {
               // Przekieruj do bramki płatności
@@ -498,9 +418,6 @@ export default function CheckoutPage() {
             );
           }
         }
-        clearCart();
-        setOrderSuccess(true);
-
       }
     } catch (error) {
       console.error("Order creation error:", error);
@@ -514,54 +431,65 @@ export default function CheckoutPage() {
 
   const processPlanetPayPayment = async (order: any) => {
     try {
-      const paymentMethod = formData.payment_method.replace("planetpay_", "").toUpperCase();
-      
+      const paymentMethod = formData.payment_method
+        .replace("planetpay_", "")
+        .toUpperCase();
+
+      const isBlik = paymentMethod === "BLIK";
+
       const paymentRequest = {
+        device: {
+          browserData: {
+            javascriptEnabled: true,
+            language: navigator.language || "pl-PL",
+          },
+        },
         channel: "WEBAPI" as const,
         method: paymentMethod as any,
         merchant: {
           merchantId: process.env.NEXT_PUBLIC_PLANET_PAY_MERCHANT_ID!,
-          name: "Padii.pl",
-          url: window.location.origin,
-          redirectURL: `${window.location.origin}/order-received/${order.id}`,
+          merchantName: "Padii.pl",
+          name: "Padii",
+          location: {
+            street: "ul. Prosta 21",
+            postal: "05-825",
+            city: "Szczęsne",
+            country: "POL",
+          },
         },
         customer: {
           email: formData.billing.email,
           name: `${formData.billing.first_name} ${formData.billing.last_name}`,
-          firstName: formData.billing.first_name,
-          lastName: formData.billing.last_name,
           billing: {
             street: formData.billing.address_1,
             postal: formData.billing.postcode,
             city: formData.billing.city,
             country: formData.billing.country,
           },
+          phone: {
+            countryCode:
+              formData.billing.phone.match(/^\+?(\d{1,3})/)?.[1] || "",
+            phoneNo: formData.billing.phone
+              .replace(/^\+\d{1,3}\s*/, "")
+              .replace(/\s+/g, ""),
+          },
         },
         order: {
-          amount: Math.round(calculateTotal() * 100), // Planet Pay wymaga kwoty w groszach
+          amount: Math.round(calculateTotal()),
+          commission: 0,
           currency: "PLN",
           extOrderId: order.id.toString(),
           description: `Zamówienie #${order.id} - Padii.pl`,
-        },
-        options: {
-          transKind: "AUTH" as const,
-          language: "pl",
-          validTime: 3600, // 1 godzina na płatność
+          shipping: {
+            city: formData.billing.city,
+            street: formData.billing.address_1,
+            postal: formData.billing.postcode,
+            country: "POL",
+          },
         },
       };
 
-      // Dodaj specyficzne dane dla różnych metod płatności
-      if (paymentMethod === "BLIK") {
-        const blikCode = (document.getElementById("blik-code") as HTMLInputElement)?.value;
-        if (blikCode && blikCode.length === 6) {
-          paymentRequest.instrument = {
-            type: "BLIK_CODE",
-            code: blikCode,
-          } as any;
-        }
-      }
-
-      const response = await fetch("/api/planetpay/payment", {
+      const createResponse = await fetch("/api/planetpay/payment", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -569,22 +497,26 @@ export default function CheckoutPage() {
         body: JSON.stringify(paymentRequest),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
+      if (!createResponse.ok) {
+        const errorData = await createResponse.json();
         throw new Error(errorData.error || "Payment processing failed");
       }
 
-      const paymentData = await response.json();
+      const createData = await createResponse.json();
+      const paymentId = createData.paymentId;
 
-      if (paymentData.status === "COMPLETED") {
+      if (!paymentId) {
+        throw new Error("Brak paymentId w odpowiedzi z PlanetPay");
+      }
+
+      if (createData.status === "COMPLETED") {
         return { success: true };
-      } else if (paymentData.redirectURL) {
-        return { success: true, redirectUrl: paymentData.redirectURL };
-      } else if (paymentData.status === "PENDING") {
-        // Dla BLIK lub innych metod wymagających dodatkowych kroków
+      } else if (createData.redirectURL) {
+        return { success: true, redirectUrl: createData.redirectURL };
+      } else if (createData.status === "PENDING") {
         return { success: true };
       } else {
-        throw new Error(paymentData.rejectInfo || "Payment failed");
+        throw new Error("Płatność odrzucona lub nieprawidłowa");
       }
     } catch (error) {
       console.error("Planet Pay payment error:", error);
@@ -630,6 +562,11 @@ export default function CheckoutPage() {
         return "BLPaczka";
     }
   };
+
+  useEffect(() => {
+    fetchPaymentMethods();
+    setIsLoading(false);
+  }, []);
 
   if (isLoading) {
     return (
@@ -755,7 +692,6 @@ export default function CheckoutPage() {
                       />
                     </div>
                   </div>
-
                   <div>
                     <Label htmlFor="company">Firma (opcjonalnie)</Label>
                     <Input
@@ -766,7 +702,6 @@ export default function CheckoutPage() {
                       }
                     />
                   </div>
-
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="email">Email *</Label>
@@ -792,7 +727,6 @@ export default function CheckoutPage() {
                       />
                     </div>
                   </div>
-
                   <div>
                     <Label htmlFor="address_1">Adres *</Label>
                     <Input
@@ -804,7 +738,6 @@ export default function CheckoutPage() {
                       required
                     />
                   </div>
-
                   <div>
                     <Label htmlFor="address_2">Adres 2 (opcjonalnie)</Label>
                     <Input
@@ -815,7 +748,7 @@ export default function CheckoutPage() {
                       }
                     />
                   </div>
-
+                  processPlanetPayPayment
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <Label htmlFor="city">Miasto *</Label>
@@ -858,10 +791,10 @@ export default function CheckoutPage() {
                           <SelectValue placeholder="Wybierz kraj" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="PL">Polska</SelectItem>
-                          <SelectItem value="DE">Niemcy</SelectItem>
-                          <SelectItem value="CZ">Czechy</SelectItem>
-                          <SelectItem value="SK">Słowacja</SelectItem>
+                          <SelectItem value="POL">Polska</SelectItem>
+                          <SelectItem value="DEU">Niemcy</SelectItem>
+                          <SelectItem value="CZE">Czechy</SelectItem>
+                          <SelectItem value="SVK">Słowacja</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -908,95 +841,84 @@ export default function CheckoutPage() {
                 </CardHeader>
                 <CardContent>
                   {formData.billing.postcode.replace(/\D/g, "").length === 5 ? (
-                    isLoadingPoints ? (
-                      <div className="flex justify-center py-4">
-                        <Loader2 className="h-6 w-6 animate-spin" />
-                        <span className="ml-2">Wyszukiwanie punktów...</span>
+                    <div className="space-y-4">
+                      <div>
+                        <Label>Kurier</Label>
+                        <Select
+                          value={selectedCourier}
+                          onValueChange={(value) => {
+                            setSelectedCourier(value);
+                            handleInputChange("blpaczka_courier", value);
+                            handleInputChange("shipping_method", value);
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Wybierz kuriera" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="dhl">DHL</SelectItem>
+                            <SelectItem value="inpost">
+                              Paczkomat InPost
+                            </SelectItem>
+                            <SelectItem value="orlen">Orlen Paczka</SelectItem>
+                            <SelectItem value="dpd">DPD</SelectItem>
+                            <SelectItem value="inpost_international">
+                              InPost International
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
-                    ) : (
-                      <div className="space-y-4">
-                        <div>
-                          <Label>Kurier</Label>
-                          <Select
-                            value={selectedCourier}
-                            onValueChange={(value) => {
-                              setSelectedCourier(value);
-                              handleInputChange("blpaczka_courier", value);
-                              handleInputChange("shipping_method", value);
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Wybierz kuriera" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="dhl">DHL</SelectItem>
-                              <SelectItem value="inpost">
-                                Paczkomat InPost
-                              </SelectItem>
-                              <SelectItem value="orlen">
-                                Orlen Paczka
-                              </SelectItem>
-                              <SelectItem value="dpd">DPD</SelectItem>
-                              <SelectItem value="inpost_international">
-                                InPost International
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
 
-                        <div className="mt-4">
-                          <Label>Wybierz punkt dostawy na mapie</Label>
-                          <div className="rounded-lg overflow-hidden border">
-                            <iframe
-                              id="pudoMap"
-                              src={`https://api.blpaczka.com/pudo-map?api_type=${selectedCourier}&postalCode=${formData.billing.postcode.replace(
-                                /\D/g,
-                                ""
-                              )}`}
-                              width="100%"
-                              height="500"
-                              frameBorder="0"
-                            ></iframe>
-                          </div>
+                      <div className="mt-4">
+                        <Label>Wybierz punkt dostawy na mapie</Label>
+                        <div className="rounded-lg overflow-hidden border">
+                          <iframe
+                            id="pudoMap"
+                            src={`https://api.blpaczka.com/pudo-map?api_type=${selectedCourier}&postalCode=${formData.billing.postcode.replace(
+                              /\D/g,
+                              ""
+                            )}`}
+                            width="100%"
+                            height="500"
+                          ></iframe>
                         </div>
+                      </div>
 
-                        <div className="mt-4">
-                          <Label>Wybrany punkt odbioru</Label>
-                          {selectedPoint ? (
-                            <div className="border rounded-lg p-4 bg-gray-50">
-                              <div className="flex items-start">
-                                <MapPin className="h-5 w-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
-                                <div>
-                                  <h4 className="font-medium">
-                                    {selectedPoint.description}
-                                  </h4>
-                                  <p className="text-sm text-muted-foreground">
-                                    {selectedPoint.address},{" "}
-                                    {selectedPoint.city}
-                                  </p>
-                                  <p className="text-xs mt-1">
-                                    <span className="font-medium">
-                                      Godziny otwarcia:
-                                    </span>{" "}
-                                    {selectedPoint.opening_hours}
-                                  </p>
-                                  <p className="text-xs mt-1">
-                                    <span className="font-medium">Kurier:</span>{" "}
-                                    {getShippingMethodTitle(
-                                      selectedPoint.courier_code
-                                    )}
-                                  </p>
-                                </div>
+                      <div className="mt-4">
+                        <Label>Wybrany punkt odbioru</Label>
+                        {selectedPoint ? (
+                          <div className="border rounded-lg p-4 bg-gray-50">
+                            <div className="flex items-start">
+                              <MapPin className="h-5 w-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
+                              <div>
+                                <h4 className="font-medium">
+                                  {selectedPoint.description}
+                                </h4>
+                                <p className="text-sm text-muted-foreground">
+                                  {selectedPoint.address}, {selectedPoint.city}
+                                </p>
+                                <p className="text-xs mt-1">
+                                  <span className="font-medium">
+                                    Godziny otwarcia:
+                                  </span>{" "}
+                                  {selectedPoint.opening_hours}
+                                </p>
+                                <p className="text-xs mt-1">
+                                  <span className="font-medium">Kurier:</span>{" "}
+                                  {getShippingMethodTitle(
+                                    selectedPoint.courier_code
+                                  )}
+                                </p>
                               </div>
                             </div>
-                          ) : (
-                            <p className="text-muted-foreground text-sm">
-                              Wybierz punkt na mapie powyżej
-                            </p>
-                          )}
-                        </div>
+                          </div>
+                        ) : (
+                          <p className="text-muted-foreground text-sm">
+                            Wybierz punkt na mapie powyżej
+                          </p>
+                        )}
                       </div>
-                    )
+                    </div>
                   ) : (
                     <p className="text-muted-foreground">
                       Wprowadź kod pocztowy w formacie 00-000
@@ -1026,58 +948,75 @@ export default function CheckoutPage() {
                       }
                     >
                       <div className="space-y-3">
-                        {paymentMethods.map((method) => (
-                          <div
-                            key={`planetpay_${method.method}`}
-                            className="flex items-center space-x-2 p-3 border rounded-lg"
-                          >
-                            <RadioGroupItem
-                              value={`planetpay_${method.method.toLowerCase()}`}
-                              id={`planetpay_${method.method}`}
-                            />
-                            <Label
-                              htmlFor={`planetpay_${method.method}`}
-                              className="flex-1"
+                        {paymentMethods
+                          .map((method) => (
+                            <div
+                              key={`planetpay_${method.method}`}
+                              className="flex items-center space-x-2 p-3 border rounded-lg"
                             >
-                              <div className="font-medium">
-                                {method.method === "CARD"
-                                  ? "Karta płatnicza"
-                                  : method.method === "BLIK"
-                                  ? "BLIK"
-                                  : method.method === "PBL"
-                                  ? "Przelew bankowy"
-                                  : method.method}
-                              </div>
-                              <div className="text-sm text-muted-foreground">
-                                {method.method === "CARD"
-                                  ? "Visa, Mastercard"
-                                  : method.method === "BLIK"
-                                  ? "Szybka płatność mobilna"
-                                  : method.method === "PBL"
-                                  ? "Przelew online"
-                                  : ""}
-                              </div>
-                            </Label>
-                          </div>
-                        ))}
-                        
+                              <RadioGroupItem
+                                value={`planetpay_${method.method.toLowerCase()}`}
+                                id={`planetpay_${method.method}`}
+                              />
+                              <Label
+                                htmlFor={`planetpay_${method.method}`}
+                                className="flex-1"
+                              >
+                                <div className="font-medium">
+                                  {method.method === "CARD"
+                                    ? "Karta płatnicza"
+                                    : method.method === "BLIK"
+                                    ? "BLIK"
+                                    : method.method === "GPAY"
+                                    ? "Google Pay"
+                                    : method.method === "APAY"
+                                    ? "Apple Pay"
+                                    : method.method === "PBL"
+                                    ? "Przelew bankowy"
+                                    : method.method}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                  {method.method === "CARD"
+                                    ? "Visa, Mastercard"
+                                    : method.method === "BLIK"
+                                    ? "Szybka płatność mobilna"
+                                    : method.method === "GPAY"
+                                    ? "Google Pay"
+                                    : method.method === "PBL"
+                                    ? "Przelew online"
+                                    : ""}
+                                </div>
+                              </Label>
+                            </div>
+                          ))
+                          .filter((item) => item.props.status !== "ENABLED")}
+
                         {/* BLIK Code Input */}
-                        {formData.payment_method === "planetpay_blik" && (
+                        {/* {formData.payment_method === "planetpay_blik" && (
                           <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
                             <div className="flex items-center gap-2 mb-3">
-                              <span className="font-medium text-blue-900">Kod BLIK</span>
+                              <span className="font-medium text-blue-900">
+                                Kod BLIK
+                              </span>
                             </div>
                             <Input
                               id="blik-code"
                               placeholder="Wprowadź 6-cyfrowy kod BLIK"
                               maxLength={6}
                               className="text-center text-lg tracking-widest font-mono"
+                              onChange={(e) =>
+                                handleInputChange(
+                                  "instrument.code",
+                                  e.target.value
+                                )
+                              }
                             />
                             <p className="text-sm text-blue-700 mt-2">
-                              Wygeneruj kod w aplikacji bankowej i wprowadź go powyżej
+                              Wygeneruj kod w aplikacji bankowej i wprowadź go
+                              powyżej
                             </p>
                           </div>
-                        )}
+                        )} */}
                       </div>
                     </RadioGroup>
                   ) : (
