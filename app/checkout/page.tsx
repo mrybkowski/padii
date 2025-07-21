@@ -562,6 +562,7 @@ export default function CheckoutPage() {
         options: {
           validTime: 1800, // 30 minut na płatność
           language: "pl",
+          asyncNotify: `${window.location.origin}/api/planetpay/webhook`,
         },
       };
 
@@ -589,10 +590,16 @@ export default function CheckoutPage() {
       const createData = await createResponse.json();
 
       if (createData.status === "COMPLETED") {
+        // Aktualizuj status zamówienia na "processing"
+        await updateOrderStatus(order.id, "processing", "Płatność zakończona sukcesem");
         return { success: true };
       } else if (createData.redirectURL) {
+        // Zapisz payment ID w localStorage dla późniejszej weryfikacji
+        localStorage.setItem(`payment_${order.id}`, createData.paymentId);
         return { success: true, redirectUrl: createData.redirectURL };
       } else if (createData.status === "NEW" || createData.status === "PENDING") {
+        // Aktualizuj status zamówienia na "pending"
+        await updateOrderStatus(order.id, "pending", "Płatność w trakcie przetwarzania");
         return { success: true };
       } else {
         throw new Error("Płatność odrzucona lub nieprawidłowa");
@@ -600,6 +607,28 @@ export default function CheckoutPage() {
     } catch (error) {
       console.error("Planet Pay payment error:", error);
       throw error;
+    }
+  };
+
+  const updateOrderStatus = async (orderId: number, status: string, note?: string) => {
+    try {
+      const response = await fetch("/api/wordpress/update-order-status", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          orderId,
+          status,
+          note,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error("Failed to update order status");
+      }
+    } catch (error) {
+      console.error("Error updating order status:", error);
     }
   };
 

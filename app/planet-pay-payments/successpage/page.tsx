@@ -53,14 +53,18 @@ export default function OrderReceivedPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const orderId = params.id as string;
-    if (!orderId) return;
-
     const checkPaymentAndOrder = async () => {
       try {
-        // Sprawdź status płatności Planet Pay jeśli jest paymentId w URL
+        // Sprawdź parametry URL dla Planet Pay
         const urlParams = new URLSearchParams(window.location.search);
         const paymentId = urlParams.get("paymentId");
+        const orderId = urlParams.get("extOrderId") || params.id;
+
+        if (!orderId) {
+          setError("Brak identyfikatora zamówienia");
+          setIsLoading(false);
+          return;
+        }
 
         if (paymentId) {
           const paymentResponse = await fetch(
@@ -70,13 +74,28 @@ export default function OrderReceivedPage() {
           if (paymentResponse.ok) {
             const paymentData = await paymentResponse.json();
             setPaymentStatus(paymentData.status);
+            
+            // Aktualizuj status zamówienia w WordPress
+            if (paymentData.status === "COMPLETED") {
+              await fetch("/api/wordpress/update-order-status", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  orderId: parseInt(orderId as string),
+                  status: "processing",
+                  note: `Płatność zakończona sukcesem przez Planet Pay. Payment ID: ${paymentId}`,
+                }),
+              });
+            }
           }
         }
 
         // Pobierz szczegóły zamówienia (mock data - w rzeczywistości z WordPress API)
         const mockOrder: OrderDetails = {
-          id: parseInt(orderId),
-          status: "processing",
+          id: parseInt(orderId as string),
+          status: paymentStatus === "COMPLETED" ? "processing" : "pending",
           total: "89.99",
           payment_method: "Planet Pay",
           shipping_method: "BLPaczka",
@@ -112,7 +131,7 @@ export default function OrderReceivedPage() {
     };
 
     checkPaymentAndOrder();
-  }, [params.id]);
+  }, [params.id, paymentStatus]);
 
   const formatPrice = (price: string) => {
     const numPrice = parseFloat(price);

@@ -319,6 +319,37 @@ class WordPressAPI {
       body: JSON.stringify(order),
     });
   }
+
+  async updateOrderStatus(id: number, status: string, note?: string): Promise<Order> {
+    const updateData: any = {
+      status: status,
+    };
+
+    if (note) {
+      updateData.customer_note = note;
+    }
+
+    // Dodaj meta dane o płatności
+    updateData.meta_data = [
+      {
+        key: "_payment_completed_date",
+        value: new Date().toISOString(),
+      },
+      {
+        key: "_payment_method_title",
+        value: "Planet Pay",
+      },
+    ];
+
+    return this.request(`/orders/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(updateData),
+    });
+  }
+
+  async getOrderById(id: number): Promise<Order> {
+    return this.request(`/orders/${id}`);
+  }
 }
 
 export const wordpressAPI = new WordPressAPI();

@@ -61,22 +61,58 @@ export default function OrderReceivedPage() {
         // Sprawdź status płatności Planet Pay jeśli jest paymentId w URL
         const urlParams = new URLSearchParams(window.location.search);
         const paymentId = urlParams.get("paymentId");
+        
+        // Lub sprawdź w localStorage
+        const storedPaymentId = localStorage.getItem(`payment_${orderId}`);
+        const finalPaymentId = paymentId || storedPaymentId;
 
-        if (paymentId) {
+        if (finalPaymentId) {
           const paymentResponse = await fetch(
-            `/api/planetpay/payment/${paymentId}/status`
+            `/api/planetpay/payment/${finalPaymentId}/status`
           );
           
           if (paymentResponse.ok) {
             const paymentData = await paymentResponse.json();
             setPaymentStatus(paymentData.status);
+            
+            // Aktualizuj status zamówienia w WordPress na podstawie statusu płatności
+            if (paymentData.status === "COMPLETED") {
+              await fetch("/api/wordpress/update-order-status", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  orderId: parseInt(orderId),
+                  status: "processing",
+                  note: `Płatność zakończona sukcesem. Payment ID: ${finalPaymentId}`,
+                }),
+              });
+            } else if (paymentData.status === "REJECTED" || paymentData.status === "CANCELLED") {
+              await fetch("/api/wordpress/update-order-status", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  orderId: parseInt(orderId),
+                  status: "cancelled",
+                  note: `Płatność odrzucona lub anulowana. Payment ID: ${finalPaymentId}`,
+                }),
+              });
+            }
+            
+            // Usuń payment ID z localStorage po sprawdzeniu
+            if (storedPaymentId) {
+              localStorage.removeItem(`payment_${orderId}`);
+            }
           }
         }
 
         // Pobierz szczegóły zamówienia (mock data - w rzeczywistości z WordPress API)
         const mockOrder: OrderDetails = {
           id: parseInt(orderId),
-          status: "processing",
+          status: paymentStatus === "COMPLETED" ? "processing" : "pending",
           total: "89.99",
           payment_method: "Planet Pay",
           shipping_method: "BLPaczka",
@@ -112,7 +148,7 @@ export default function OrderReceivedPage() {
     };
 
     checkPaymentAndOrder();
-  }, [params.id]);
+  }, [params.id, paymentStatus]);
 
   const formatPrice = (price: string) => {
     const numPrice = parseFloat(price);
