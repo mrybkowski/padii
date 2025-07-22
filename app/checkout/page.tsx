@@ -31,6 +31,7 @@ import {
   MapPin,
 } from "lucide-react";
 import { useCart } from "@/hooks/use-cart";
+import { useWCCart } from "@/hooks/use-wc-cart";
 import { Header } from "@/components/Header";
 import { wordpressAPI } from "@/lib/wordpress";
 import { paymentManager } from "@/lib/payments";
@@ -73,7 +74,8 @@ import type { PaymentMethod } from "@/lib/planetpay";
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { cart, clearCart } = useCart();
+  const { cart: localCart, clearCart: clearLocalCart } = useCart();
+  const { cart: wcCart, clearCart: clearWCCart, formatPrice: wcFormatPrice } = useWCCart();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
@@ -236,6 +238,9 @@ export default function CheckoutPage() {
   };
 
   const formatPrice = (price: number) => {
+    if (wcCart) {
+      return wcFormatPrice(price.toString());
+    }
     return new Intl.NumberFormat("pl-PL", {
       style: "currency",
       currency: "PLN",
@@ -243,16 +248,22 @@ export default function CheckoutPage() {
   };
 
   const calculateShipping = () => {
+    if (wcCart) {
+      return parseFloat(wcCart.totals.total_shipping) / Math.pow(10, wcCart.totals.currency_minor_unit);
+    }
     return shippingManager.calculateShippingCost(
       formData.shipping_method,
-      2, // Średnia waga zamówienia
-      cart.total
+      2,
+      localCart.total
     );
   };
 
   const calculateTotal = () => {
+    if (wcCart) {
+      return parseFloat(wcCart.totals.total_price) / Math.pow(10, wcCart.totals.currency_minor_unit);
+    }
     const shipping = calculateShipping();
-    return cart.total + shipping - couponDiscount;
+    return localCart.total + shipping - couponDiscount;
   };
 
   const validateCoupon = async () => {
@@ -267,7 +278,7 @@ export default function CheckoutPage() {
         const coupon = coupons[0];
         const discount =
           coupon.discount_type === "percent"
-            ? (cart.total * parseFloat(coupon.amount)) / 100
+            ? (getCurrentCartTotal() * parseFloat(coupon.amount)) / 100
             : parseFloat(coupon.amount);
         setCouponDiscount(discount);
       } else {
@@ -278,6 +289,14 @@ export default function CheckoutPage() {
     } finally {
       setIsValidatingCoupon(false);
     }
+  };
+
+  const getCurrentCartTotal = () => {
+    return wcCart ? parseFloat(wcCart.totals.total_items) / Math.pow(10, wcCart.totals.currency_minor_unit) : localCart.total;
+  };
+
+  const getCurrentCartItems = () => {
+    return wcCart ? wcCart.items : localCart.items;
   };
 
   const handleInputChange = (
@@ -335,50 +354,85 @@ export default function CheckoutPage() {
     setOrderError(null);
 
     try {
-      const orderData = {
-        payment_method: formData.payment_method,
-        payment_method_title: getPaymentMethodTitle(formData.payment_method),
-        set_paid: false,
+      // Przygotuj dane dla WooCommerce Store API
+      const checkoutData = {
         billing: formData.billing,
-        shipping: shippingToBilling ? formData.billing : formData.shipping,
-        line_items: cart.items.map((item) => ({
-          product_id: item.product.id,
-          variation_id: item.variationId || 0,
-          quantity: item.quantity,
-        })),
-        shipping_lines: [
+        billing_address: {
+          first_name: formData.billing.first_name,
+          last_name: formData.billing.last_name,
+          company: formData.billing.company || "",
+          address_1: formData.billing.address_1,
+          address_2: formData.billing.address_2 || "",
+          city: formData.billing.city,
+          state: "",
+          postcode: formData.billing.postcode,
+          country: formData.billing.country,
+          email: formData.billing.email,
+          phone: formData.billing.phone,
+        },
+        shipping_address: shippingToBilling ? {
+          first_name: formData.billing.first_name,
+          last_name: formData.billing.last_name,
+          company: formData.billing.company || "",
+          address_1: formData.billing.address_1,
+          address_2: formData.billing.address_2 || "",
+          city: formData.billing.city,
+          state: "",
+          postcode: formData.billing.postcode,
+          country: formData.billing.country,
+          phone: formData.billing.phone,
+        } : formData.shipping,
+        payment_method: formData.payment_method,
+        payment_data: [
           {
-            method_id: formData.shipping_method,
-            method_title: getShippingMethodTitle(formData.shipping_method),
-            total: calculateShipping().toString(),
+            key: `wc-${formData.payment_method}-new-payment-method`,
+            value: false,
           },
         ],
-        coupon_lines: couponCode
-          ? [
-              {
-                code: couponCode,
-                discount: couponDiscount.toString(),
-              },
-            ]
-          : [],
         customer_note: formData.customer_note || "",
-        meta_data: [
-          {
-            key: "_order_total",
-            value: calculateTotal().toString(),
+        create_account: false,
+        customer_password: "",
+        additional_fields: {},
+        extensions: {
+          "woocommerce/order-attribution": {
+            source_type: "typein",
+            referrer: document.referrer || "(none)",
+            utm_campaign: "(none)",
+            utm_source: "(direct)",
+            utm_medium: "(none)",
+            utm_content: "(none)",
+            utm_id: "(none)",
+            utm_term: "(none)",
+            utm_source_platform: "(none)",
+            utm_creative_format: "(none)",
+            utm_marketing_tactic: "(none)",
+            session_entry: window.location.origin,
+            session_start_time: new Date().toISOString().slice(0, 19).replace('T', ' '),
+            session_pages: "1",
+            session_count: "1",
+            user_agent: navigator.userAgent,
           },
-          {
-            key: "_delivery_point_id",
-            value: formData.delivery_point || "",
+          blpaczka: {
+            "blpaczka-point": formData.delivery_point || "",
           },
-          {
-            key: "_blpaczka_courier",
-            value: formData.blpaczka_courier || "",
-          },
-        ],
+        },
       };
 
-      const order = await wordpressAPI.createOrder(orderData);
+      // Użyj WooCommerce Store API
+      const response = await fetch('/api/wordpress/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(checkoutData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Checkout failed');
+      }
+
+      const order = await response.json();
 
       if (order.id) {
         // Utwórz przesyłkę w BLPaczka jeśli potrzeba
@@ -433,7 +487,8 @@ export default function CheckoutPage() {
                 });
 
               // Płatność zakończona sukcesem
-              clearCart();
+              clearLocalCart();
+              clearWCCart();
               setOrderSuccess(true);
               return;
             }
@@ -461,7 +516,8 @@ export default function CheckoutPage() {
         }
 
         // Jeśli dotarliśmy tutaj, oznacza to sukces (np. płatność przy odbiorze)
-        clearCart();
+        clearLocalCart();
+        clearWCCart();
         setOrderSuccess(true);
       }
     } catch (error) {
@@ -782,7 +838,10 @@ export default function CheckoutPage() {
     );
   }
 
-  if (cart.items.length === 0) {
+  const currentCart = wcCart || localCart;
+  const currentCartItems = getCurrentCartItems();
+
+  if (currentCartItems.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
@@ -1222,18 +1281,18 @@ export default function CheckoutPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-3">
-                    {cart.items.map((item) => (
+                    {currentCartItems.map((item) => (
                       <div
-                        key={`${item.product.id}-${item.variationId || ""}`}
+                        key={wcCart ? item.key : `${item.product.id}-${item.variationId || ""}`}
                         className="flex gap-3"
                       >
                         <div className="relative h-12 w-12 flex-shrink-0">
                           <Image
                             src={
-                              item.product.images[0]?.src ||
+                              (wcCart ? item.images[0]?.src : item.product.images[0]?.src) ||
                               "/placeholder-product.jpg"
                             }
-                            alt={item.product.name}
+                            alt={wcCart ? item.name : item.product.name}
                             fill
                             className="object-cover rounded"
                             sizes="48px"
@@ -1241,11 +1300,15 @@ export default function CheckoutPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <h4 className="font-medium text-sm line-clamp-2">
-                            <span
-                              dangerouslySetInnerHTML={{
-                                __html: item.product.name,
-                              }}
-                            />
+                            {wcCart ? (
+                              item.name
+                            ) : (
+                              <span
+                                dangerouslySetInnerHTML={{
+                                  __html: item.product.name,
+                                }}
+                              />
+                            )}
                           </h4>
                           <div className="flex justify-between items-center mt-1">
                             <span className="text-sm text-muted-foreground">
@@ -1253,11 +1316,9 @@ export default function CheckoutPage() {
                             </span>
                             <span className="font-medium text-sm">
                               {formatPrice(
-                                parseFloat(
-                                  item.product.sale_price ||
-                                    item.product.regular_price ||
-                                    "0"
-                                ) * item.quantity
+                                wcCart 
+                                  ? parseFloat(item.totals.line_total) / Math.pow(10, wcCart.totals.currency_minor_unit)
+                                  : parseFloat(item.product.sale_price || item.product.regular_price || "0") * item.quantity
                               )}
                             </span>
                           </div>
@@ -1301,7 +1362,7 @@ export default function CheckoutPage() {
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span>Produkty</span>
-                      <span>{formatPrice(cart.total)}</span>
+                      <span>{formatPrice(getCurrentCartTotal())}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Dostawa (BLPaczka)</span>
