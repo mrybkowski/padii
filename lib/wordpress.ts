@@ -203,6 +203,109 @@ class WordPressAPI {
     return this.request("/products/categories");
   }
 
+  // WooCommerce Store API methods
+  async addToCart(productId: number, quantity: number = 1, variationId?: number): Promise<any> {
+    const payload = {
+      id: productId,
+      quantity: quantity,
+      ...(variationId && { variation_id: variationId })
+    };
+
+    return this.request("/wc/store/v1/cart/add-item", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async getCart(): Promise<any> {
+    return this.request("/wc/store/v1/cart");
+  }
+
+  async updateCartItem(key: string, quantity: number): Promise<any> {
+    return this.request(`/wc/store/v1/cart/items/${key}`, {
+      method: "POST",
+      body: JSON.stringify({ quantity }),
+    });
+  }
+
+  async removeCartItem(key: string): Promise<any> {
+    return this.request(`/wc/store/v1/cart/items/${key}`, {
+      method: "DELETE",
+    });
+  }
+
+  async clearCart(): Promise<any> {
+    return this.request("/wc/store/v1/cart/items", {
+      method: "DELETE",
+    });
+  }
+
+  // WooCommerce Store API Checkout
+  async createStoreCheckout(checkoutData: {
+    billing_address: {
+      first_name: string;
+      last_name: string;
+      company?: string;
+      address_1: string;
+      address_2?: string;
+      city: string;
+      state?: string;
+      postcode: string;
+      country: string;
+      email: string;
+      phone?: string;
+    };
+    shipping_address?: {
+      first_name: string;
+      last_name: string;
+      company?: string;
+      address_1: string;
+      address_2?: string;
+      city: string;
+      state?: string;
+      postcode: string;
+      country: string;
+      phone?: string;
+    };
+    payment_method: string;
+    payment_data?: Array<{
+      key: string;
+      value: any;
+    }>;
+    customer_note?: string;
+    create_account?: boolean;
+    customer_password?: string;
+    additional_fields?: Record<string, any>;
+    extensions?: {
+      blpaczka?: {
+        "blpaczka-point"?: string;
+      };
+      "woocommerce/order-attribution"?: {
+        source_type?: string;
+        referrer?: string;
+        utm_campaign?: string;
+        utm_source?: string;
+        utm_medium?: string;
+        utm_content?: string;
+        utm_id?: string;
+        utm_term?: string;
+        utm_source_platform?: string;
+        utm_creative_format?: string;
+        utm_marketing_tactic?: string;
+        session_entry?: string;
+        session_start_time?: string;
+        session_pages?: string;
+        session_count?: string;
+        user_agent?: string;
+      };
+    };
+  }): Promise<any> {
+    return this.request("/wc/store/v1/checkout?_locale=site", {
+      method: "POST",
+      body: JSON.stringify(checkoutData),
+    });
+  }
+
   async createOrder(orderData: any) {
     return this.request("/orders", {
       method: "POST",
