@@ -400,12 +400,38 @@ export default function CheckoutPage() {
             const paymentResult = await processPlanetPayPayment(order);
 
             console.log("Payment result:", paymentResult);
+                  // Aktualizuj status zamówienia
+                  await fetch(`/api/wordpress/orders/${order.id}/payment-status`, {
+                    method: "PUT",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      status: "processing",
+                      paymentMethod: "Planet Pay",
+                      note: "Płatność zakończona sukcesem",
+                    }),
+                  });
+
 
             if (paymentResult.success && paymentResult.redirectUrl) {
               // Przekieruj do bramki płatności
               window.location.href = paymentResult.redirectUrl;
               return;
             } else if (paymentResult.success) {
+                // Aktualizuj status zamówienia na failed
+                await fetch(`/api/wordpress/orders/${order.id}/payment-status`, {
+                  method: "PUT",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    status: "failed",
+                    paymentMethod: "Planet Pay",
+                    note: "Błąd podczas przetwarzania płatności",
+                  }),
+                });
+
               // Płatność zakończona sukcesem
               clearCart();
               setOrderSuccess(true);
@@ -414,6 +440,21 @@ export default function CheckoutPage() {
           } catch (error) {
             console.error("Payment processing error:", error);
             setOrderError(
+            // Aktualizuj status zamówienia dla płatności przy odbiorze
+            if (formData.payment_method === "planetpay_cod") {
+              await fetch(`/api/wordpress/orders/${order.id}/payment-status`, {
+                method: "PUT",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  status: "processing",
+                  paymentMethod: "Płatność przy odbiorze",
+                  note: "Zamówienie z płatnością przy odbiorze",
+                }),
+              });
+            }
+
               "Błąd podczas przetwarzania płatności. Zamówienie zostało złożone, ale płatność wymaga ręcznego przetworzenia."
             );
           }

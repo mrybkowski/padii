@@ -88,18 +88,32 @@ export default function OrderReceivedPage() {
                   note: `Płatność zakończona sukcesem. Payment ID: ${finalPaymentId}`,
                 }),
               });
-            } else if (
-              paymentData.status === "REJECTED" ||
-              paymentData.status === "CANCELLED"
-            ) {
-              await fetch("/api/wordpress/update-order-status", {
-                method: "POST",
+            } else if (paymentData.status === "PENDING") {
+              await fetch(`/api/wordpress/orders/${orderId}/payment-status`, {
+                method: "PUT",
                 headers: {
                   "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                  orderId: parseInt(orderId),
-                  status: "cancelled",
+                  status: "pending",
+                  transactionId: finalPaymentId,
+                  paymentMethod: "Planet Pay",
+                  note: `Płatność w trakcie przetwarzania. Payment ID: ${finalPaymentId}`,
+                }),
+              });
+            } else if (
+              paymentData.status === "REJECTED" ||
+              paymentData.status === "CANCELLED"
+            ) {
+              await fetch(`/api/wordpress/orders/${orderId}/payment-status`, {
+                method: "PUT",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  status: "failed",
+                  transactionId: finalPaymentId,
+                  paymentMethod: "Planet Pay",
                   note: `Płatność odrzucona lub anulowana. Payment ID: ${finalPaymentId}`,
                 }),
               });

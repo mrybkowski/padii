@@ -350,6 +350,100 @@ class WordPressAPI {
   async getOrderById(id: number): Promise<Order> {
     return this.request(`/orders/${id}`);
   }
+
+  async getOrders(params: {
+    page?: number;
+    per_page?: number;
+    status?: string;
+    customer?: number;
+    search?: string;
+    after?: string;
+    before?: string;
+    orderby?: string;
+    order?: string;
+  } = {}): Promise<Order[]> {
+    const searchParams = new URLSearchParams();
+
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined) {
+        searchParams.append(key, value.toString());
+      }
+    });
+
+    const query = searchParams.toString();
+    const endpoint = `/orders${query ? `?${query}` : ""}`;
+
+    return this.request(endpoint);
+  }
+
+  async updateOrderPaymentStatus(
+    id: number, 
+    paymentStatus: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled',
+    transactionId?: string,
+    paymentMethod?: string,
+    note?: string
+  ): Promise<Order> {
+    const updateData: any = {
+      status: paymentStatus,
+    };
+
+    const metaData = [
+      {
+        key: "_payment_status_updated",
+        value: new Date().toISOString(),
+      },
+    ];
+
+    if (transactionId) {
+      metaData.push({
+        key: "_transaction_id",
+        value: transactionId,
+      });
+    }
+
+    if (paymentMethod) {
+      metaData.push({
+        key: "_payment_method",
+        value: paymentMethod,
+      });
+      metaData.push({
+        key: "_payment_method_title",
+        value: paymentMethod,
+      });
+    }
+
+    if (paymentStatus === 'completed') {
+      metaData.push({
+        key: "_paid_date",
+        value: new Date().toISOString(),
+      });
+    }
+
+    updateData.meta_data = metaData;
+
+    if (note) {
+      updateData.customer_note = note;
+    }
+
+    return this.request(`/orders/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(updateData),
+    });
+  }
+
+  async addOrderNote(id: number, note: string, customerNote: boolean = false): Promise<any> {
+    return this.request(`/orders/${id}/notes`, {
+      method: "POST",
+      body: JSON.stringify({
+        note: note,
+        customer_note: customerNote,
+      }),
+    });
+  }
+
+  async getOrderNotes(id: number): Promise<any[]> {
+    return this.request(`/orders/${id}/notes`);
+  }
 }
 
 export const wordpressAPI = new WordPressAPI();

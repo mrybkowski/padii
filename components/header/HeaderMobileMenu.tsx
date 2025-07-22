@@ -27,6 +27,12 @@ export function HeaderMobileMenu() {
             Produkty
           </Link>
           <Link
+            href="/blog"
+            className="text-lg font-medium hover:text-primary transition-colors"
+          >
+            Blog
+          </Link>
+          <Link
             href="/contact"
             className="text-lg font-medium hover:text-primary transition-colors"
           >

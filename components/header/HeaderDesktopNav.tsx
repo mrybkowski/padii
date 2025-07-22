@@ -16,6 +16,12 @@ export function HeaderDesktopNav() {
         Produkty
       </Link>
       <Link
+        href="/blog"
+        className="text-sm font-medium hover:text-primary transition-colors"
+      >
+        Blog
+      </Link>
+      <Link
         href="/contact"
         className="text-sm font-medium hover:text-primary transition-colors"
       >
