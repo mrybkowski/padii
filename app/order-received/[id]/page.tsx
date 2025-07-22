@@ -22,7 +22,7 @@ interface OrderDetails {
   id: number;
   status: string;
   total: string;
-  payment_method: string;
+  payment_method_title: string;
   shipping_method: string;
   billing: {
     first_name: string;
@@ -38,7 +38,7 @@ interface OrderDetails {
     id: number;
     name: string;
     quantity: number;
-    price: string;
+    price: number;
     total: string;
   }>;
   date_created: string;
@@ -61,7 +61,7 @@ export default function OrderReceivedPage() {
         // Sprawdź status płatności Planet Pay jeśli jest paymentId w URL
         const urlParams = new URLSearchParams(window.location.search);
         const paymentId = urlParams.get("paymentId");
-        
+
         // Lub sprawdź w localStorage
         const storedPaymentId = localStorage.getItem(`payment_${orderId}`);
         const finalPaymentId = paymentId || storedPaymentId;
@@ -70,11 +70,11 @@ export default function OrderReceivedPage() {
           const paymentResponse = await fetch(
             `/api/planetpay/payment/${finalPaymentId}/status`
           );
-          
+
           if (paymentResponse.ok) {
             const paymentData = await paymentResponse.json();
             setPaymentStatus(paymentData.status);
-            
+
             // Aktualizuj status zamówienia w WordPress na podstawie statusu płatności
             if (paymentData.status === "COMPLETED") {
               await fetch("/api/wordpress/update-order-status", {
@@ -88,7 +88,10 @@ export default function OrderReceivedPage() {
                   note: `Płatność zakończona sukcesem. Payment ID: ${finalPaymentId}`,
                 }),
               });
-            } else if (paymentData.status === "REJECTED" || paymentData.status === "CANCELLED") {
+            } else if (
+              paymentData.status === "REJECTED" ||
+              paymentData.status === "CANCELLED"
+            ) {
               await fetch("/api/wordpress/update-order-status", {
                 method: "POST",
                 headers: {
@@ -101,7 +104,7 @@ export default function OrderReceivedPage() {
                 }),
               });
             }
-            
+
             // Usuń payment ID z localStorage po sprawdzeniu
             if (storedPaymentId) {
               localStorage.removeItem(`payment_${orderId}`);
@@ -109,36 +112,44 @@ export default function OrderReceivedPage() {
           }
         }
 
-        // Pobierz szczegóły zamówienia (mock data - w rzeczywistości z WordPress API)
-        const mockOrder: OrderDetails = {
-          id: parseInt(orderId),
-          status: paymentStatus === "COMPLETED" ? "processing" : "pending",
-          total: "89.99",
-          payment_method: "Planet Pay",
-          shipping_method: "BLPaczka",
+        // Pobierz szczegóły zamówienia z WordPress API
+        const orderResponse = await fetch(`/api/wordpress/orders/${orderId}`);
+
+        if (!orderResponse.ok) {
+          throw new Error("Nie udało się pobrać zamówienia");
+        }
+
+        const orderData = await orderResponse.json();
+
+        // Mapuj dane z WooCommerce na nasz interfejs
+        const mappedOrder: OrderDetails = {
+          id: orderData.id,
+          status: orderData.status,
+          total: orderData.total,
+          payment_method_title: orderData.payment_method_title,
+          shipping_method:
+            orderData.shipping_lines[0]?.method_title || "Brak danych",
           billing: {
-            first_name: "Jan",
-            last_name: "Kowalski",
-            email: "jan@example.com",
-            phone: "+48123456789",
-            address_1: "ul. Testowa 1",
-            city: "Warszawa",
-            postcode: "00-001",
-            country: "PL",
+            first_name: orderData.billing.first_name,
+            last_name: orderData.billing.last_name,
+            email: orderData.billing.email,
+            phone: orderData.billing.phone,
+            address_1: orderData.billing.address_1,
+            city: orderData.billing.city,
+            postcode: orderData.billing.postcode,
+            country: orderData.billing.country,
           },
-          line_items: [
-            {
-              id: 1,
-              name: "Podkłady higieniczne 60x60cm",
-              quantity: 2,
-              price: "39.99",
-              total: "79.98",
-            },
-          ],
-          date_created: new Date().toISOString(),
+          line_items: orderData.line_items.map((item: any) => ({
+            id: item.id,
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price,
+            total: item.total,
+          })),
+          date_created: orderData.date_created,
         };
 
-        setOrder(mockOrder);
+        setOrder(mappedOrder);
       } catch (error) {
         console.error("Error loading order:", error);
         setError("Nie udało się załadować szczegółów zamówienia");
@@ -185,6 +196,20 @@ export default function OrderReceivedPage() {
       default:
         return "Sprawdzanie statusu płatności...";
     }
+  };
+
+  const mapOrderStatus = (status: string) => {
+    const statusMap: Record<string, string> = {
+      pending: "Oczekujące",
+      processing: "W realizacji",
+      "on-hold": "Wstrzymane",
+      completed: "Zakończone",
+      cancelled: "Anulowane",
+      refunded: "Zwrócone",
+      failed: "Nieudane",
+    };
+
+    return statusMap[status] || status;
   };
 
   if (isLoading) {
@@ -282,11 +307,15 @@ export default function OrderReceivedPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Status:</span>
-                <Badge variant="secondary">W realizacji</Badge>
+                <Badge variant="secondary">
+                  {mapOrderStatus(order.status)}
+                </Badge>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Metoda płatności:</span>
-                <span className="font-medium">{order.payment_method}</span>
+                <span className="font-medium">
+                  {order.payment_method_title}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Dostawa:</span>
@@ -305,9 +334,7 @@ export default function OrderReceivedPage() {
                         Ilość: {item.quantity}
                       </div>
                     </div>
-                    <div className="font-medium">
-                      {formatPrice(item.total)}
-                    </div>
+                    <div className="font-medium">{formatPrice(item.total)}</div>
                   </div>
                 ))}
               </div>

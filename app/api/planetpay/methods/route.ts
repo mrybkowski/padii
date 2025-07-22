@@ -20,6 +20,7 @@ export async function GET(req: NextRequest) {
           channel: "PAYWALL",
           secret: PLANET_PAY_SECRET,
           merchant: { merchantId: PLANET_PAY_MERCHANT_ID },
+          customer: { email: "marcin@rybkowski.pl" },
         }),
       }
     );

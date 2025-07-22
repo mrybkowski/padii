@@ -433,7 +433,10 @@ export default function CheckoutPage() {
     }
   };
 
-  const createBLPaczkaShipment = async (order: any, deliveryPoint: DeliveryPoint | null) => {
+  const createBLPaczkaShipment = async (
+    order: any,
+    deliveryPoint: DeliveryPoint | null
+  ) => {
     try {
       const shipmentData = {
         courierSearch: {
@@ -548,7 +551,7 @@ export default function CheckoutPage() {
           },
         },
         order: {
-          amount: Math.round(calculateTotal() * 100), // Planet Pay wymaga kwoty w groszach
+          amount: Math.round(calculateTotal()), // Planet Pay wymaga kwoty w groszach
           currency: "PLN",
           extOrderId: order.id.toString(),
           description: `Zamówienie #${order.id} - Padii.pl`,
@@ -562,17 +565,17 @@ export default function CheckoutPage() {
         options: {
           validTime: 1800, // 30 minut na płatność
           language: "pl",
-          asyncNotify: `${window.location.origin}/api/planetpay/webhook`,
+          // asyncNotify: `http://localhost:3000/api/planetpay/webhook`,
         },
       };
 
       // Dodaj instrument dla BLIK jeśli potrzebny
-      if (paymentMethod === "BLIK" && formData.instrument?.code) {
-        paymentRequest.instrument = {
-          type: "BLIK_CODE",
-          code: formData.instrument.code,
-        };
-      }
+      // if (paymentMethod === "BLIK" && formData.instrument?.code) {
+      //   paymentRequest.instrument = {
+      //     type: "BLIK_CODE",
+      //     code: formData.instrument.code,
+      //   };
+      // }
 
       const createResponse = await fetch("/api/planetpay/payment", {
         method: "POST",
@@ -591,15 +594,26 @@ export default function CheckoutPage() {
 
       if (createData.status === "COMPLETED") {
         // Aktualizuj status zamówienia na "processing"
-        await updateOrderStatus(order.id, "processing", "Płatność zakończona sukcesem");
+        await updateOrderStatus(
+          order.id,
+          "processing",
+          "Płatność zakończona sukcesem"
+        );
         return { success: true };
       } else if (createData.redirectURL) {
         // Zapisz payment ID w localStorage dla późniejszej weryfikacji
         localStorage.setItem(`payment_${order.id}`, createData.paymentId);
         return { success: true, redirectUrl: createData.redirectURL };
-      } else if (createData.status === "NEW" || createData.status === "PENDING") {
+      } else if (
+        createData.status === "NEW" ||
+        createData.status === "PENDING"
+      ) {
         // Aktualizuj status zamówienia na "pending"
-        await updateOrderStatus(order.id, "pending", "Płatność w trakcie przetwarzania");
+        await updateOrderStatus(
+          order.id,
+          "pending",
+          "Płatność w trakcie przetwarzania"
+        );
         return { success: true };
       } else {
         throw new Error("Płatność odrzucona lub nieprawidłowa");
@@ -610,7 +624,11 @@ export default function CheckoutPage() {
     }
   };
 
-  const updateOrderStatus = async (orderId: number, status: string, note?: string) => {
+  const updateOrderStatus = async (
+    orderId: number,
+    status: string,
+    note?: string
+  ) => {
     try {
       const response = await fetch("/api/wordpress/update-order-status", {
         method: "POST",
@@ -981,7 +999,9 @@ export default function CheckoutPage() {
                         <div className="rounded-lg overflow-hidden border">
                           <iframe
                             id="pudoMap"
-                            src={`${process.env.NEXT_PUBLIC_BL_API_URL}/pudo-map?api_type=${selectedCourier}&postalCode=${formData.billing.postcode.replace(
+                            src={`${
+                              process.env.NEXT_PUBLIC_BL_API_URL
+                            }/pudo-map?api_type=${selectedCourier}&postalCode=${formData.billing.postcode.replace(
                               /\D/g,
                               ""
                             )}`}
@@ -1099,7 +1119,7 @@ export default function CheckoutPage() {
                           .filter((item) => item.props.status !== "ENABLED")}
 
                         {/* BLIK Code Input */}
-                        {formData.payment_method === "planetpay_blik" && (
+                        {/* {formData.payment_method === "planetpay_blik" && (
                           <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
                             <div className="flex items-center gap-2 mb-3">
                               <span className="font-medium text-blue-900">
@@ -1124,7 +1144,7 @@ export default function CheckoutPage() {
                               powyżej
                             </p>
                           </div>
-                        )}
+                        )} */}
                       </div>
                     </RadioGroup>
                   ) : (
@@ -1264,9 +1284,9 @@ export default function CheckoutPage() {
                     className="w-full"
                     size="lg"
                     disabled={
-                      isSubmitting || 
-                      (formData.shipping_method !== "blpaczka" && !formData.delivery_point) ||
-                      (formData.payment_method === "planetpay_blik" && !formData.instrument?.code)
+                      isSubmitting ||
+                      (formData.shipping_method !== "blpaczka" &&
+                        !formData.delivery_point)
                     }
                   >
                     {isSubmitting ? (
